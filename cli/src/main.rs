@@ -1,11 +1,15 @@
+mod cmd_doctor;
+mod cmd_stats;
 mod tui;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 use nodewipe_core::{
-    annotate_workspace_roots, delete, group_by_workspace, load_config, load_ignore_patterns, restore, scan,
-    ArtifactKind, DeleteMode, Entry, ScanOptions,
+    annotate_workspace_roots, delete, find_stale_projects, group_by_workspace,
+    history_append, load_config, load_ignore_patterns, restore, scan,
+    ArtifactKind, DeleteMode, Entry, HistoryEntry, ScanOptions,
 };
+use nodewipe_core::history::{now_unix, format_date};
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::time::{Duration, SystemTime};
@@ -19,8 +23,6 @@ const BANNER: &str = r#"
                                    |_|         
 "#;
 
-/// Comma-separated list of type slugs, e.g. "venv,pycache,rust_target".
-/// Scanning covers every known kind by default; this is how you opt out.
 const TYPE_HELP: &str = "node_modules, venv, pycache, pytest_cache, mypy_cache, \
 ruff_cache, rust_target, maven_target, gradle_build, next_cache, turbo_cache, dist";
 
@@ -35,33 +37,18 @@ struct Cli {
     #[command(subcommand)]
     command: Option<Command>,
 
-    /// Directory to scan, given directly (ncdu-style): `nodewipe /`,
-    /// `nodewipe ~`, `nodewipe ../some-project`. Takes priority over --root
-    /// if both are given.
     #[arg(value_name = "PATH")]
     path: Option<PathBuf>,
 
-    /// Root directory to scan. Prefer the positional form above for
-    /// everyday use; this flag mainly exists for scripts that build up
-    /// arguments explicitly.
     #[arg(long, global = true, default_value = ".")]
     root: PathBuf,
 
-    /// Emit machine-readable JSON instead of a human table.
-    /// This is the headless mode requested in npkill#188 — safe for scripts/CI.
     #[arg(long, global = true)]
     json: bool,
 
-    /// Comma-separated artifact types to skip, in addition to any set via
-    /// default_exclude_types in the config file. Everything is scanned by
-    /// default. Valid values: node_modules, venv, pycache, pytest_cache,
-    /// mypy_cache, ruff_cache, rust_target, maven_target, gradle_build,
-    /// next_cache, turbo_cache, dist.
     #[arg(long, global = true, value_delimiter = ',')]
     exclude_types: Vec<String>,
 
-    /// Skip loading .nodewipeignore files (both the global ~/.nodewipeignore
-    /// and any in the scan root).
     #[arg(long, global = true)]
     no_ignore_file: bool,
 }
@@ -79,43 +66,52 @@ enum Command {
         grouped: bool,
 
         /// Only show artifacts whose last modification is older than this,
-        /// e.g. `30d`, `2w`, `6m`, `1y`. Surfaces likely-abandoned projects
-        /// rather than active ones you'd still want to keep intact.
+        /// e.g. `30d`, `2w`, `6m`, `1y`.
         #[arg(long)]
         older_than: Option<String>,
+
+        /// Primary sort order: `size` (largest first, default) or `age`
+        /// (oldest-last-touched first, surfaces abandoned projects).
+        #[arg(long, value_enum, default_value_t = SortKey::Size)]
+        sort: SortKey,
+
+        /// Flag projects as likely-abandoned when source files haven't been
+        /// touched in this many days. Prints a stale-project summary below
+        /// the normal scan output.
+        #[arg(long)]
+        stale_days: Option<u64>,
     },
     /// Delete one or more artifact directories.
     Delete {
-        /// Path(s) to delete. Must be a recognized artifact directory
-        /// (node_modules, venv, __pycache__, target, build, dist, ...).
         paths: Vec<PathBuf>,
 
-        /// How to delete: move to OS trash (recoverable), archive to .tar.gz
-        /// first, or permanently remove. Falls back to config file's
-        /// default_delete_mode, then Trash, if not given.
         #[arg(long, value_enum)]
         mode: Option<DeleteModeArg>,
 
-        /// Skip the confirmation prompt (required for non-interactive/CI use).
         #[arg(long)]
         yes: bool,
 
-        /// Show what would be deleted without deleting anything.
         #[arg(long)]
         dry_run: bool,
     },
-    /// Restore a `.tar.gz` backup created by `delete --mode archive` back
-    /// into its original location.
+    /// Restore a `.tar.gz` backup created by `delete --mode archive`.
     Restore {
-        /// Path to the `-backup.tar.gz` file to restore.
         archive: PathBuf,
     },
     /// List every supported artifact type and its slug (for --exclude-types).
     Types,
-    /// Launch the desktop GUI. Looks for a nodewipe-gui binary/AppImage
-    /// installed alongside this CLI (e.g. via install.sh's CLI+GUI option,
-    /// or a from-source `cargo build --release --workspace`).
+    /// Launch the desktop GUI.
     Gui,
+    /// Scan your system and show a breakdown of disk usage by ecosystem:
+    /// how many Rust target/ dirs, Python venvs, etc., and which is oldest.
+    Doctor,
+    /// Show a dashboard of how much space you have freed over time.
+    /// Reads ~/.local/share/nodewipe/history.json.
+    Stats {
+        /// How many past days to include in the bar chart.
+        #[arg(long, default_value_t = 30)]
+        days: u64,
+    },
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -135,6 +131,14 @@ impl From<DeleteModeArg> for DeleteMode {
     }
 }
 
+#[derive(Clone, Copy, ValueEnum)]
+enum SortKey {
+    /// Sort by size, largest first (default).
+    Size,
+    /// Sort by last-modified date, oldest first.
+    Age,
+}
+
 fn main() -> ExitCode {
     let cli = Cli::parse();
     match run(cli) {
@@ -150,8 +154,6 @@ fn run(cli: Cli) -> Result<ExitCode> {
     let config = load_config();
     let root = cli.path.clone().unwrap_or_else(|| cli.root.clone());
 
-    // Merge CLI-provided exclude types with the config file's defaults —
-    // both apply; the config sets a baseline, flags add to it per-invocation.
     let mut exclude_kinds = parse_exclude_types(&cli.exclude_types)?;
     if let Some(defaults) = &config.default_exclude_types {
         exclude_kinds.extend(parse_exclude_types(defaults)?);
@@ -163,20 +165,15 @@ fn run(cli: Cli) -> Result<ExitCode> {
 
     match cli.command {
         None => {
-            // Default UX: interactive TUI when attached to a real terminal
-            // (matches npkill's default behavior). Falls back to a headless
-            // scan when piped/redirected or when --json is requested, so
-            // `nodewipe > out.json` or `nodewipe --json` still work without
-            // needing the explicit `scan` subcommand.
             if cli.json || !atty_stdout() {
-                cmd_scan(&root, cli.json, 0, false, exclude_kinds, ignore_patterns, None)
+                cmd_scan(&root, cli.json, 0, false, exclude_kinds, ignore_patterns, None, SortKey::Size, None)
             } else {
                 tui::run(root)?;
                 Ok(ExitCode::SUCCESS)
             }
         }
-        Some(Command::Scan { min_mb, grouped, older_than }) => {
-            cmd_scan(&root, cli.json, min_mb, grouped, exclude_kinds, ignore_patterns, older_than)
+        Some(Command::Scan { min_mb, grouped, older_than, sort, stale_days }) => {
+            cmd_scan(&root, cli.json, min_mb, grouped, exclude_kinds, ignore_patterns, older_than, sort, stale_days)
         }
         Some(Command::Delete { paths, mode, yes, dry_run }) => {
             let resolved_mode = resolve_delete_mode(mode, &config);
@@ -185,6 +182,12 @@ fn run(cli: Cli) -> Result<ExitCode> {
         Some(Command::Restore { archive }) => cmd_restore(&archive, cli.json),
         Some(Command::Types) => cmd_types(),
         Some(Command::Gui) => cmd_gui(),
+        Some(Command::Doctor) => {
+            cmd_doctor::run(root, cli.json, exclude_kinds, ignore_patterns)
+        }
+        Some(Command::Stats { days }) => {
+            cmd_stats::run(cli.json, days)
+        }
     }
 }
 
@@ -212,9 +215,6 @@ fn parse_exclude_types(raw: &[String]) -> Result<Vec<ArtifactKind>> {
         .collect()
 }
 
-/// Parses simple age strings like "30d", "2w", "6m", "1y". A bare number is
-/// treated as days. Months/years are approximate (30/365 days) — precise
-/// calendar math isn't the point here, "roughly how stale is this" is.
 fn parse_duration(s: &str) -> Result<Duration> {
     let s = s.trim();
     let (num_part, unit) = match s.chars().last() {
@@ -258,6 +258,8 @@ fn cmd_scan(
     exclude_kinds: Vec<ArtifactKind>,
     ignore_patterns: Vec<String>,
     older_than: Option<String>,
+    sort: SortKey,
+    stale_days: Option<u64>,
 ) -> Result<ExitCode> {
     let opts = ScanOptions {
         root: root.clone(),
@@ -277,11 +279,30 @@ fn cmd_scan(
         let now = SystemTime::now();
         entries.retain(|e| match e.last_modified {
             Some(t) => now.duration_since(t).map(|age| age >= threshold).unwrap_or(false),
-            None => false, // unknown age: don't claim it's stale
+            None => false,
         });
     }
 
-    entries.sort_by(|a, b| b.size_bytes.cmp(&a.size_bytes));
+    match sort {
+        SortKey::Size => {
+            entries.sort_by(|a, b| b.size_bytes.cmp(&a.size_bytes));
+        }
+        SortKey::Age => {
+            entries.sort_by(|a, b| match (a.last_modified, b.last_modified) {
+                (Some(ta), Some(tb)) => ta.cmp(&tb),
+                (None, Some(_)) => std::cmp::Ordering::Greater,
+                (Some(_), None) => std::cmp::Ordering::Less,
+                (None, None) => std::cmp::Ordering::Equal,
+            });
+        }
+    }
+
+    let stale = if let Some(days) = stale_days {
+        let threshold = Duration::from_secs(days * 86400);
+        find_stale_projects(&entries, threshold)
+    } else {
+        Vec::new()
+    };
 
     if grouped {
         let groups = group_by_workspace(entries);
@@ -296,13 +317,44 @@ fn cmd_scan(
             }
         }
     } else if json {
-        println!("{}", serde_json::to_string_pretty(&entries)?);
+        let out = serde_json::json!({
+            "entries": entries,
+            "stale_projects": stale,
+        });
+        println!("{}", serde_json::to_string_pretty(&out)?);
     } else {
         let total: u64 = entries.iter().map(|e| e.size_bytes).sum();
+        let now = SystemTime::now();
         for e in &entries {
-            println!("{}  {}  {}", human_size(e.size_bytes), kind_display(e), e.path.display());
+            let age_str = match e.last_modified {
+                Some(mtime) => {
+                    let days = now.duration_since(mtime)
+                        .map(|d| d.as_secs() / 86400)
+                        .unwrap_or(0);
+                    format!("{:>4}d", days)
+                }
+                None => "   ?d".to_string(),
+            };
+            println!("{}  {}  {}  {}", human_size(e.size_bytes), age_str, kind_display(e), e.path.display());
         }
         println!("\n{} artifacts found, {} reclaimable", entries.len(), human_size(total));
+
+        if !stale.is_empty() {
+            println!(
+                "\n ⚠  {} likely-abandoned project{} (source untouched for {}+ days):\n",
+                stale.len(),
+                if stale.len() == 1 { "" } else { "s" },
+                stale_days.unwrap_or(90),
+            );
+            for s in &stale {
+                println!("   {} days   {}   {}",
+                    s.stale_days,
+                    human_size(s.reclaimable_bytes),
+                    s.root.display(),
+                );
+            }
+            println!();
+        }
     }
 
     Ok(ExitCode::SUCCESS)
@@ -339,8 +391,23 @@ fn cmd_delete(
 
     for p in &paths {
         let size = dir_size_quick(p);
+        let kind_slug = nodewipe_core::classify_path(p)
+            .map(|k| k.slug().to_string())
+            .unwrap_or_else(|| "unknown".to_string());
+
         match delete(p, mode, size) {
-            Ok(r) => results.push(r),
+            Ok(r) => {
+                let ts = now_unix();
+                let _ = history_append(HistoryEntry {
+                    deleted_at: ts,
+                    date: format_date(ts),
+                    path: p.display().to_string(),
+                    kind: kind_slug,
+                    size_bytes: size,
+                    mode: format!("{mode:?}").to_lowercase(),
+                });
+                results.push(r);
+            }
             Err(e) => {
                 had_error = true;
                 eprintln!("failed to delete {}: {e:#}", p.display());
@@ -408,7 +475,6 @@ fn cmd_gui() -> Result<ExitCode> {
         }
     }
 
-    // macOS: fall back to the installed .app bundle, if any.
     if cfg!(target_os = "macos") {
         let launched = std::process::Command::new("open").arg("-a").arg("nodewipe").status();
         if matches!(launched, Ok(status) if status.success()) {

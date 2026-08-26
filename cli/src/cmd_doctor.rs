@@ -1,77 +1,156 @@
-use nodewipe_core::{annotate_workspace_roots, find_stale_projects, load_ignore_patterns, scan, ArtifactKind, ScanOptions};
+/// `nodewipe doctor` — system-wide disk-hog analysis by ecosystem.
+///
+/// Scans the given root (default: `~`), builds a `DoctorReport`, and prints
+/// a human-readable summary.  `--json` emits the raw report instead.
+///
+/// Example output:
+///
+/// ```
+/// nodewipe doctor
+///
+///  🩺  nodewipe doctor — scanning /home/user ...
+///
+///  Total reclaimable: 18.4 GB across 47 artifact directories
+///
+///  Ecosystem         Count   Total      Oldest untouched
+///  ─────────────────────────────────────────────────────────────────
+///  Rust target/        8    12.1 GB    247 days  ~/old-project/target
+///  node_modules       21     3.4 GB     89 days  ~/archive/foo/node_modules
+///  Python venv         9     1.8 GB    142 days  ~/scripts/.venv
+///  ...
+///
+///  Run `nodewipe scan --older-than 90d` to list candidates for deletion.
+/// ```
+use anyhow::Result;
+use nodewipe_core::{
+    doctor::build_report,
+    scan,
+    ArtifactKind,
+    ScanOptions,
+};
 use std::path::PathBuf;
+use std::process::ExitCode;
 
-pub fn run(root: &PathBuf, stale_days: u64, json: bool) -> anyhow::Result<()> {
-    let opts = ScanOptions { root: root.clone(), ignore_patterns: load_ignore_patterns(root), ..Default::default() };
-    eprintln!("Scanning {}...", root.display());
-    let mut entries = scan(&opts)?;
-    annotate_workspace_roots(&mut entries, &opts.root);
+pub fn run(root: PathBuf, json: bool, exclude_kinds: Vec<ArtifactKind>, ignore_patterns: Vec<String>) -> Result<ExitCode> {
+    if !json {
+        eprintln!("\n 🩺  nodewipe doctor — scanning {} …\n", root.display());
+        eprintln!(" This may take a moment on large trees.\n");
+    }
+
+    let opts = ScanOptions {
+        root: root.clone(),
+        exclude_kinds,
+        ignore_patterns,
+        compute_sizes: true,
+        ..Default::default()
+    };
+
+    let entries = scan(&opts)?;
+    let report = build_report(&entries);
 
     if json {
-        println!("{}", serde_json::to_string_pretty(&serde_json::json!({
-            "root": root.display().to_string(),
-            "total_bytes": entries.iter().map(|e| e.size_bytes).sum::<u64>(),
-            "by_ecosystem": build_summary(&entries),
-            "stale_projects": find_stale_projects(&entries, stale_days),
-        }))?);
-        return Ok(());
+        println!("{}", serde_json::to_string_pretty(&report)?);
+        return Ok(ExitCode::SUCCESS);
     }
 
-    let total: u64 = entries.iter().map(|e| e.size_bytes).sum();
-    println!("\n nodewipe doctor — {}\n", root.display());
-    println!(" {:<20} {:>10}  {:>6}  {}", "Ecosystem", "Size", "Count", "Description");
-    println!(" {}", "─".repeat(76));
+    // ── human output ──────────────────────────────────────────────────────
 
-    let mut by_kind = build_kind_list(&entries);
-    by_kind.sort_by(|a, b| b.1.cmp(&a.1));
-    for (kind, size, count) in &by_kind {
-        println!(" {:<20} {:>10}  {:>6}  {}",
-            kind.label(), human_size(*size), count,
-            kind.description().chars().take(44).collect::<String>());
+    println!(
+        " Total reclaimable: {} across {} artifact directories\n",
+        human_size(report.total_bytes),
+        report.total_count
+    );
+
+    if report.ecosystems.is_empty() {
+        println!(" ✅  No artifact directories found. Your system is clean!");
+        return Ok(ExitCode::SUCCESS);
     }
-    println!(" {}", "─".repeat(76));
-    println!(" {:<20} {:>10}  {:>6}", "TOTAL", human_size(total), entries.len());
 
-    let stale = find_stale_projects(&entries, stale_days);
-    println!();
-    if stale.is_empty() {
-        println!(" ✓  No stale projects (source changed within {}d).", stale_days);
-    } else {
-        println!(" ⚠  {} stale project(s) — source unchanged for {}+ days:\n", stale.len(), stale_days);
-        println!(" {:<50} {:>10}  {:>8}", "Project", "Size", "Days idle");
-        println!(" {}", "─".repeat(72));
-        for p in &stale {
-            println!(" {:<50} {:>10}  {:>8}",
-                truncate(&p.root.display().to_string(), 50),
-                human_size(p.total_artifact_bytes),
-                p.days_since_source_change);
+    // Table header
+    println!(
+        " {:<22} {:>6}   {:>10}   {:<10}  {}",
+        "Ecosystem", "Count", "Total", "Oldest", "Oldest path"
+    );
+    println!(" {}", "─".repeat(80));
+
+    for eco in &report.ecosystems {
+        let oldest_str = match eco.oldest_days {
+            Some(d) => format!("{d} days"),
+            None => "unknown".to_string(),
+        };
+        let oldest_path = eco
+            .oldest_path
+            .as_deref()
+            .unwrap_or("—")
+            .to_string();
+        // Truncate very long paths for display.
+        let oldest_path = truncate_path(&oldest_path, 45);
+
+        println!(
+            " {:<22} {:>6}   {:>10}   {:<10}  {}",
+            eco.label,
+            eco.count,
+            human_size(eco.total_bytes),
+            oldest_str,
+            oldest_path,
+        );
+    }
+
+    println!("\n {}", "─".repeat(80));
+
+    // Biggest single artifacts across all ecosystems — actionable quick wins.
+    let mut all_biggest: Vec<_> = report
+        .ecosystems
+        .iter()
+        .flat_map(|e| e.biggest.iter())
+        .collect();
+    all_biggest.sort_by(|a, b| b.size_bytes.cmp(&a.size_bytes));
+    all_biggest.truncate(5);
+
+    if !all_biggest.is_empty() {
+        println!("\n Top space consumers:\n");
+        for b in &all_biggest {
+            let age = match b.age_days {
+                Some(d) => format!("{d}d ago"),
+                None => "unknown age".to_string(),
+            };
+            println!(
+                "   {}  ({})  {}",
+                human_size(b.size_bytes),
+                age,
+                truncate_path(&b.path, 60),
+            );
         }
-        println!("\n Run `nodewipe scan --older-than {}d --root <path>` to clean up.", stale_days);
     }
+
     println!();
-    Ok(())
+    println!(" 💡 Next steps:");
+    println!("    nodewipe scan --older-than 90d    # list stale artifacts");
+    println!("    nodewipe scan --older-than 90d --json | jq  # script-friendly");
+    println!("    nodewipe delete <path> --mode trash          # safe delete");
+    println!();
+
+    Ok(ExitCode::SUCCESS)
 }
 
-fn build_kind_list(entries: &[nodewipe_core::Entry]) -> Vec<(ArtifactKind, u64, usize)> {
-    use std::collections::HashMap;
-    let mut map: HashMap<ArtifactKind, (u64, usize)> = HashMap::new();
-    for e in entries { let v = map.entry(e.kind).or_insert((0,0)); v.0 += e.size_bytes; v.1 += 1; }
-    map.into_iter().map(|(k,(s,c))| (k,s,c)).collect()
-}
-
-fn build_summary(entries: &[nodewipe_core::Entry]) -> Vec<serde_json::Value> {
-    build_kind_list(entries).into_iter().map(|(kind, size, count)| {
-        serde_json::json!({"kind": kind.slug(), "label": kind.label(), "total_bytes": size, "count": count})
-    }).collect()
-}
+// ── helpers ───────────────────────────────────────────────────────────────────
 
 fn human_size(bytes: u64) -> String {
-    const U: [&str;5] = ["B","KB","MB","GB","TB"];
-    let mut s = bytes as f64; let mut u = 0;
-    while s >= 1024.0 && u < 4 { s /= 1024.0; u += 1; }
-    format!("{s:.2} {}", U[u])
+    const UNITS: [&str; 5] = ["B", "KB", "MB", "GB", "TB"];
+    let mut size = bytes as f64;
+    let mut unit = 0;
+    while size >= 1024.0 && unit < UNITS.len() - 1 {
+        size /= 1024.0;
+        unit += 1;
+    }
+    format!("{size:.1} {}", UNITS[unit])
 }
 
-fn truncate(s: &str, max: usize) -> String {
-    if s.len() <= max { s.to_string() } else { format!("…{}", &s[s.len().saturating_sub(max-1)..]) }
+/// Shorten a path to at most `max` chars, eliding the middle.
+fn truncate_path(path: &str, max: usize) -> String {
+    if path.len() <= max {
+        return path.to_string();
+    }
+    let half = (max - 3) / 2;
+    format!("{}...{}", &path[..half], &path[path.len() - half..])
 }

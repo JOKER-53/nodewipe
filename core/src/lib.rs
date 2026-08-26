@@ -4,6 +4,7 @@ pub mod history;
 pub mod ignorefile;
 pub mod model;
 pub mod scanner;
+pub mod doctor;
 pub mod stale;
 pub mod workspace;
 
