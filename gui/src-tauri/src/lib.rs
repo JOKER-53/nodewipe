@@ -1,4 +1,9 @@
-use nodewipe_core::{annotate_workspace_roots, delete as core_delete, group_by_workspace, restore as core_restore, scan as core_scan, DeleteMode, Entry, ScanOptions, WorkspaceGroup};
+use nodewipe_core::{
+    annotate_workspace_roots, delete as core_delete, doctor::build_report,
+    group_by_workspace, history_append, history_load, restore as core_restore,
+    scan as core_scan, DeleteMode, Entry, HistoryEntry, ScanOptions, WorkspaceGroup,
+};
+use nodewipe_core::history::{format_date, now_unix, stats_by_ecosystem, daily_totals};
 use std::path::PathBuf;
 use walkdir::WalkDir;
 
@@ -44,14 +49,34 @@ fn delete_command(paths: Vec<String>, mode: String, sizes: Vec<u64>) -> Result<V
     let mut results = Vec::with_capacity(paths.len());
     for (path_str, size) in paths.into_iter().zip(sizes) {
         let path = PathBuf::from(&path_str);
+        let kind_slug = nodewipe_core::classify_path(&path)
+            .map(|k| k.slug().to_string())
+            .unwrap_or_else(|| "unknown".to_string());
+
         match core_delete(&path, delete_mode, size) {
-            Ok(res) => results.push(DeleteOutcome {
+            Ok(res) => {
+                let ts = now_unix();
+                let _ = history_append(HistoryEntry {
+                    deleted_at: ts,
+                    date: format_date(ts),
+                    path: path_str.clone(),
+                    kind: kind_slug,
+                    size_bytes: size,
+                    mode: format!("{delete_mode:?}").to_lowercase(),
+                });
+                results.push(DeleteOutcome {
+                    path: path_str,
+                    freed_bytes: res.freed_bytes,
+                    archive_path: res.archive_path.map(|p| p.display().to_string()),
+                    error: None,
+                });
+            }
+            Err(e) => results.push(DeleteOutcome {
                 path: path_str,
-                freed_bytes: res.freed_bytes,
-                archive_path: res.archive_path.map(|p| p.display().to_string()),
-                error: None,
+                freed_bytes: 0,
+                archive_path: None,
+                error: Some(e.to_string()),
             }),
-            Err(e) => results.push(DeleteOutcome { path: path_str, freed_bytes: 0, archive_path: None, error: Some(e.to_string()) }),
         }
     }
     Ok(results)
@@ -92,6 +117,29 @@ fn home_dir_command() -> Result<String, String> {
         .ok_or_else(|| "could not determine home directory".to_string())
 }
 
+#[tauri::command(async)]
+fn doctor_command(root: String) -> Result<serde_json::Value, String> {
+    let opts = ScanOptions { root: PathBuf::from(root), ..Default::default() };
+    let entries = core_scan(&opts).map_err(|e| e.to_string())?;
+    let report = build_report(&entries);
+    serde_json::to_value(report).map_err(|e| e.to_string())
+}
+
+#[tauri::command(async)]
+fn stats_command() -> Result<serde_json::Value, String> {
+    let entries = history_load().map_err(|e| e.to_string())?;
+    let total_bytes: u64 = entries.iter().map(|e| e.size_bytes).sum();
+    let total_count = entries.len();
+    let by_ecosystem = stats_by_ecosystem(&entries);
+    let daily = daily_totals(&entries);
+    Ok(serde_json::json!({
+        "total_freed_bytes": total_bytes,
+        "total_deletions": total_count,
+        "by_ecosystem": by_ecosystem,
+        "daily": daily,
+    }))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -101,7 +149,9 @@ pub fn run() {
             delete_command,
             find_archives_command,
             restore_command,
-            home_dir_command
+            home_dir_command,
+            doctor_command,
+            stats_command,
         ])
         .run(tauri::generate_context!())
         .expect("error while running nodewipe GUI");

@@ -484,3 +484,118 @@ footer {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+
+/* ── Append these rules to the end of gui/web/src/styles.css ── */
+
+/* Tab bar */
+.tab-bar {
+  display: flex;
+  gap: 2px;
+  padding: 0 1rem;
+  border-bottom: 1px solid var(--border, #333);
+  background: var(--surface, #1a1a1a);
+}
+.tab-btn {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted, #888);
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 0.6rem 1rem;
+  transition: color 0.15s, border-color 0.15s;
+}
+.tab-btn:hover { color: var(--text, #eee); }
+.tab-btn.active {
+  color: var(--accent, #7c9ef8);
+  border-bottom-color: var(--accent, #7c9ef8);
+}
+.tab-panel { display: block; }
+.tab-panel.hidden { display: none; }
+
+/* Doctor tab */
+.doctor-content { padding: 1rem; }
+.doctor-total {
+  font-size: 0.95rem;
+  margin-bottom: 1rem;
+  color: var(--text, #eee);
+}
+.doctor-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  margin-bottom: 1.5rem;
+}
+.doctor-table th {
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--border, #333);
+  color: var(--text-muted, #888);
+  font-weight: 500;
+}
+.doctor-table td {
+  padding: 0.35rem 0.6rem;
+  border-bottom: 1px solid var(--border-subtle, #222);
+  vertical-align: middle;
+}
+.doctor-biggest h3 {
+  font-size: 0.85rem;
+  color: var(--text-muted, #888);
+  margin-bottom: 0.5rem;
+}
+.doctor-biggest-row {
+  display: flex;
+  gap: 1rem;
+  align-items: baseline;
+  font-size: 0.85rem;
+  padding: 0.2rem 0;
+}
+
+/* Stats tab */
+.stats-content { padding: 1rem; }
+.stats-total {
+  font-size: 0.95rem;
+  margin-bottom: 1rem;
+  color: var(--text, #eee);
+}
+
+/* Bar chart */
+.stats-chart { margin-top: 1.5rem; }
+.stats-chart h3 {
+  font-size: 0.85rem;
+  color: var(--text-muted, #888);
+  margin-bottom: 0.75rem;
+}
+.chart-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.35rem;
+  font-size: 0.8rem;
+}
+.chart-date {
+  width: 6rem;
+  flex-shrink: 0;
+  color: var(--text-muted, #888);
+  font-variant-numeric: tabular-nums;
+}
+.chart-bar-wrap {
+  flex: 1;
+  background: var(--border-subtle, #222);
+  border-radius: 3px;
+  height: 14px;
+  overflow: hidden;
+}
+.chart-bar {
+  height: 100%;
+  background: var(--accent, #7c9ef8);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+.chart-label {
+  width: 10rem;
+  flex-shrink: 0;
+  color: var(--text-muted, #888);
+  font-variant-numeric: tabular-nums;
+}

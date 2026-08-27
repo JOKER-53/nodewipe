@@ -32,6 +32,22 @@ const modalConfirm = document.getElementById("modal-confirm");
 const toastStack = document.getElementById("toast-stack");
 const typeChips = document.getElementById("type-chips");
 
+// ── Tab switching ─────────────────────────────────────────────────────────────
+
+document.querySelectorAll(".tab-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+    document.querySelectorAll(".tab-panel").forEach((p) => p.classList.add("hidden"));
+    btn.classList.add("active");
+    document.getElementById(`tab-${btn.dataset.tab}`).classList.remove("hidden");
+
+    // Auto-load stats when switching to that tab.
+    if (btn.dataset.tab === "stats") loadStats();
+  });
+});
+
+// ── Kind labels / badges ──────────────────────────────────────────────────────
+
 function renderChips() {
   typeChips.innerHTML = "";
   Object.entries(KIND_LABELS).forEach(([kind, label]) => {
@@ -122,12 +138,10 @@ function showToast(message, kind = "info") {
   setTimeout(() => el.remove(), 4000);
 }
 
+// ── Scan tab ──────────────────────────────────────────────────────────────────
+
 function allVisibleEntries() {
-  // Flattened view of whatever is currently on screen, in display order,
-  // used for select-all and bulk actions regardless of flat/grouped mode.
-  if (viewMode === "flat") {
-    return filteredSorted(flatEntries);
-  }
+  if (viewMode === "flat") return filteredSorted(flatEntries);
   const out = [];
   for (const g of groups) {
     for (const e of g.entries) {
@@ -154,9 +168,7 @@ function filteredSorted(list) {
   return filtered;
 }
 
-function keyFor(entry) {
-  return entry.path;
-}
+function keyFor(entry) { return entry.path; }
 
 function renderRow(entry) {
   const row = document.createElement("tr");
@@ -225,10 +237,7 @@ function render() {
         render();
       });
       resultsBody.appendChild(headerRow);
-
-      if (!collapsed) {
-        groupEntries.forEach((e) => resultsBody.appendChild(renderRow(e)));
-      }
+      if (!collapsed) groupEntries.forEach((e) => resultsBody.appendChild(renderRow(e)));
     });
   }
 
@@ -324,18 +333,11 @@ function riskyNotesFor(targets) {
   return notes;
 }
 
-/// Gate before any delete button acts. Permanent always confirms via the
-/// modal. Trash/Archive normally proceed immediately (Trash is recoverable,
-/// Archive keeps a backup) — but if the selection includes a risky kind
-/// (e.g. a Python venv), they route through the same modal first, since
-/// "recoverable in the OS trash" doesn't help a process that breaks the
-/// instant the venv disappears from disk.
 let pendingMode = null;
 
 function requestDelete(mode) {
   const targets = selectedEntryObjects();
   if (targets.length === 0) return;
-
   const risky = riskyNotesFor(targets);
 
   if (mode === "permanent") {
@@ -361,38 +363,179 @@ function requestDelete(mode) {
   performDelete(mode);
 }
 
-function closeModal() {
-  modalBackdrop.classList.add("hidden");
+function closeModal() { modalBackdrop.classList.add("hidden"); }
+
+// ── Doctor tab ────────────────────────────────────────────────────────────────
+
+async function runDoctor() {
+  const root = rootInput.value.trim();
+  if (!root) { showToast("Enter a folder in the header first.", "error"); return; }
+
+  const doctorSpinner = document.getElementById("doctor-spinner");
+  const doctorContent = document.getElementById("doctor-content");
+  const doctorEmpty = document.getElementById("doctor-empty");
+
+  doctorSpinner.classList.remove("hidden");
+  doctorContent.classList.add("hidden");
+  doctorEmpty.classList.add("hidden");
+
+  try {
+    const report = await invoke("doctor_command", { root });
+
+    document.getElementById("doctor-total").innerHTML =
+      `<strong>Total reclaimable:</strong> ${humanSize(report.total_bytes)} across ${report.total_count} artifact directories`;
+
+    const body = document.getElementById("doctor-body");
+    body.innerHTML = "";
+    for (const eco of report.ecosystems) {
+      const oldest = eco.oldest_days != null ? `${eco.oldest_days}d` : "—";
+      const oldestPath = eco.oldest_path
+        ? `<span title="${eco.oldest_path}">${truncatePath(eco.oldest_path, 40)}</span>`
+        : "—";
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><span class="badge badge-unknown">${eco.label}</span></td>
+        <td>${eco.count}</td>
+        <td>${humanSize(eco.total_bytes)}</td>
+        <td>${oldest}</td>
+        <td class="path-cell">${oldestPath}</td>
+      `;
+      body.appendChild(tr);
+    }
+
+    // Top 5 biggest
+    const allBiggest = report.ecosystems.flatMap((e) => e.biggest);
+    allBiggest.sort((a, b) => b.size_bytes - a.size_bytes);
+    const top5 = allBiggest.slice(0, 5);
+    const biggestDiv = document.getElementById("doctor-biggest");
+    if (top5.length > 0) {
+      biggestDiv.innerHTML = `<h3>Top space consumers</h3>` +
+        top5.map((b) => {
+          const age = b.age_days != null ? `${b.age_days}d ago` : "unknown age";
+          return `<div class="doctor-biggest-row">
+            <span class="size-cell">${humanSize(b.size_bytes)}</span>
+            <span class="group-meta">${age}</span>
+            <span class="path-cell" title="${b.path}">${truncatePath(b.path, 60)}</span>
+          </div>`;
+        }).join("");
+    } else {
+      biggestDiv.innerHTML = "";
+    }
+
+    doctorContent.classList.remove("hidden");
+  } catch (e) {
+    showToast(`Doctor failed: ${e}`, "error");
+    doctorEmpty.classList.remove("hidden");
+  } finally {
+    doctorSpinner.classList.add("hidden");
+  }
 }
 
+// ── Stats tab ─────────────────────────────────────────────────────────────────
+
+async function loadStats() {
+  const statsContent = document.getElementById("stats-content");
+  const statsEmpty = document.getElementById("stats-empty");
+
+  try {
+    const data = await invoke("stats_command");
+
+    if (data.total_deletions === 0) {
+      statsContent.classList.add("hidden");
+      statsEmpty.classList.remove("hidden");
+      return;
+    }
+
+    document.getElementById("stats-total").innerHTML =
+      `<strong>Total freed:</strong> ${humanSize(data.total_freed_bytes)} across ${data.total_deletions} deletion${data.total_deletions === 1 ? "" : "s"}`;
+
+    const ecoBody = document.getElementById("stats-eco-body");
+    ecoBody.innerHTML = "";
+    for (const eco of data.by_ecosystem) {
+      const lastDate = eco.last_deleted_at > 0
+        ? formatRelative(eco.last_deleted_at)
+        : "—";
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${eco.kind}</td>
+        <td>${eco.count}</td>
+        <td>${humanSize(eco.total_bytes)}</td>
+        <td>${lastDate}</td>
+      `;
+      ecoBody.appendChild(tr);
+    }
+
+    // Bar chart — last 30 days
+    const chartDiv = document.getElementById("stats-chart");
+    const daily = data.daily || [];
+    const cutoff = dateMinusDays(30);
+    const recent = daily.filter((d) => d.date >= cutoff);
+
+    if (recent.length > 0) {
+      const maxBytes = Math.max(...recent.map((d) => d.bytes_freed));
+      chartDiv.innerHTML = "<h3>Last 30 days</h3>" +
+        recent.map((d) => {
+          const barPct = maxBytes > 0 ? Math.max(4, (d.bytes_freed / maxBytes) * 100) : 4;
+          return `<div class="chart-row">
+            <span class="chart-date">${d.date}</span>
+            <div class="chart-bar-wrap">
+              <div class="chart-bar" style="width:${barPct}%"></div>
+            </div>
+            <span class="chart-label">${humanSize(d.bytes_freed)} (${d.count})</span>
+          </div>`;
+        }).join("");
+    } else {
+      chartDiv.innerHTML = "<p class='restore-empty'>No deletions in the last 30 days.</p>";
+    }
+
+    statsContent.classList.remove("hidden");
+    statsEmpty.classList.add("hidden");
+  } catch (e) {
+    showToast(`Stats failed: ${e}`, "error");
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function truncatePath(path, max) {
+  if (path.length <= max) return path;
+  const half = Math.floor((max - 3) / 2);
+  return path.slice(0, half) + "..." + path.slice(path.length - half);
+}
+
+function formatRelative(unixSecs) {
+  const now = Math.floor(Date.now() / 1000);
+  const diff = now - unixSecs;
+  const days = Math.floor(diff / 86400);
+  if (days === 0) return "today";
+  if (days === 1) return "yesterday";
+  return `${days} days ago`;
+}
+
+function dateMinusDays(n) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toISOString().slice(0, 10);
+}
+
+// ── Event listeners ───────────────────────────────────────────────────────────
+
 scanBtn.addEventListener("click", doScan);
-rootInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") doScan();
-});
-searchInput.addEventListener("input", (e) => {
-  filterText = e.target.value;
-  render();
-});
+rootInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doScan(); });
+searchInput.addEventListener("input", (e) => { filterText = e.target.value; render(); });
 
 selectAll.addEventListener("change", () => {
   const visible = allVisibleEntries();
-  if (selectAll.checked) {
-    visible.forEach((e) => selected.add(keyFor(e)));
-  } else {
-    visible.forEach((e) => selected.delete(keyFor(e)));
-  }
+  if (selectAll.checked) visible.forEach((e) => selected.add(keyFor(e)));
+  else visible.forEach((e) => selected.delete(keyFor(e)));
   render();
 });
 
 document.querySelectorAll("th.sortable").forEach((th) => {
   th.addEventListener("click", () => {
     const key = th.dataset.sort;
-    if (sortKey === key) {
-      sortDir = sortDir === "asc" ? "desc" : "asc";
-    } else {
-      sortKey = key;
-      sortDir = "desc";
-    }
+    if (sortKey === key) sortDir = sortDir === "asc" ? "desc" : "asc";
+    else { sortKey = key; sortDir = "desc"; }
     document.querySelectorAll(".sort-arrow").forEach((s) => (s.textContent = ""));
     th.querySelector(".sort-arrow").textContent = sortDir === "asc" ? "↑" : "↓";
     render();
@@ -421,9 +564,10 @@ modalConfirm.addEventListener("click", () => {
   closeModal();
   if (mode) performDelete(mode);
 });
-modalBackdrop.addEventListener("click", (e) => {
-  if (e.target === modalBackdrop) closeModal();
-});
+modalBackdrop.addEventListener("click", (e) => { if (e.target === modalBackdrop) closeModal(); });
+
+document.getElementById("doctor-btn").addEventListener("click", runDoctor);
+document.getElementById("stats-btn").addEventListener("click", loadStats);
 
 const restoreBtn = document.getElementById("restore-btn");
 const restorePanel = document.getElementById("restore-panel");
@@ -453,7 +597,7 @@ async function openRestorePanel() {
         try {
           const restored = await invoke("restore_command", { archivePath: arc.path });
           showToast(`Restored to ${restored}`, "success");
-          openRestorePanel(); // refresh list
+          openRestorePanel();
         } catch (e) {
           showToast(`Restore failed: ${e}`, "error");
         }
@@ -467,9 +611,6 @@ async function openRestorePanel() {
 
 restoreBtn.addEventListener("click", openRestorePanel);
 restoreClose.addEventListener("click", () => restorePanel.classList.add("hidden"));
-invoke("home_dir_command").then((home) => {
-  rootInput.value = home;
-});
 
-// Build the type-filter chip row now that KIND_LABELS exists.
+invoke("home_dir_command").then((home) => { rootInput.value = home; });
 renderChips();
