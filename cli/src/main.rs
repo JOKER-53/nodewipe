@@ -57,6 +57,10 @@ struct Cli {
 enum Command {
     /// Scan for disposable artifact directories (default if no subcommand given).
     Scan {
+        /// Directory to scan, e.g. `nodewipe scan ~`
+        #[arg(value_name = "PATH")]
+        path: Option<PathBuf>,
+
         /// Only show entries at least this many megabytes in size.
         #[arg(long, default_value_t = 0)]
         min_mb: u64,
@@ -104,13 +108,21 @@ enum Command {
     Gui,
     /// Scan your system and show a breakdown of disk usage by ecosystem:
     /// how many Rust target/ dirs, Python venvs, etc., and which is oldest.
-    Doctor,
+    Doctor {
+        /// Directory to scan, e.g. `nodewipe doctor ~`
+        #[arg(value_name = "PATH")]
+        path: Option<PathBuf>,
+    },
     /// Show a dashboard of how much space you have freed over time.
     /// Reads ~/.local/share/nodewipe/history.json.
     Stats {
         /// How many past days to include in the bar chart.
         #[arg(long, default_value_t = 30)]
         days: u64,
+
+        /// Directory context (unused by stats, accepted for consistency).
+        #[arg(value_name = "PATH")]
+        path: Option<PathBuf>,
     },
 }
 
@@ -172,8 +184,9 @@ fn run(cli: Cli) -> Result<ExitCode> {
                 Ok(ExitCode::SUCCESS)
             }
         }
-        Some(Command::Scan { min_mb, grouped, older_than, sort, stale_days }) => {
-            cmd_scan(&root, cli.json, min_mb, grouped, exclude_kinds, ignore_patterns, older_than, sort, stale_days)
+        Some(Command::Scan { path: sub_path, min_mb, grouped, older_than, sort, stale_days }) => {
+            let scan_root = sub_path.unwrap_or(root);
+            cmd_scan(&scan_root, cli.json, min_mb, grouped, exclude_kinds, ignore_patterns, older_than, sort, stale_days)
         }
         Some(Command::Delete { paths, mode, yes, dry_run }) => {
             let resolved_mode = resolve_delete_mode(mode, &config);
@@ -182,10 +195,11 @@ fn run(cli: Cli) -> Result<ExitCode> {
         Some(Command::Restore { archive }) => cmd_restore(&archive, cli.json),
         Some(Command::Types) => cmd_types(),
         Some(Command::Gui) => cmd_gui(),
-        Some(Command::Doctor) => {
-            cmd_doctor::run(root, cli.json, exclude_kinds, ignore_patterns)
+        Some(Command::Doctor { path: sub_path }) => {
+            let doctor_root = sub_path.unwrap_or(root);
+            cmd_doctor::run(doctor_root, cli.json, exclude_kinds, ignore_patterns)
         }
-        Some(Command::Stats { days }) => {
+        Some(Command::Stats { days, path: _ }) => {
             cmd_stats::run(cli.json, days)
         }
     }

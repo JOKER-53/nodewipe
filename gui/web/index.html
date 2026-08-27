@@ -20,73 +20,141 @@
     </div>
   </header>
 
-  <div class="toolbar">
-    <div id="summary" class="summary">Enter a folder and click Scan.</div>
-    <div class="view-toggle">
-      <button id="view-flat" class="toggle-btn active">Flat</button>
-      <button id="view-grouped" class="toggle-btn">Grouped</button>
+  <!-- Tab bar -->
+  <nav class="tab-bar">
+    <button class="tab-btn active" data-tab="scan">🔍 Scan</button>
+    <button class="tab-btn" data-tab="doctor">🩺 Doctor</button>
+    <button class="tab-btn" data-tab="stats">📊 Stats</button>
+  </nav>
+
+  <!-- ── SCAN TAB ── -->
+  <div id="tab-scan" class="tab-panel">
+    <div class="toolbar">
+      <div id="summary" class="summary">Enter a folder and click Scan.</div>
+      <div class="view-toggle">
+        <button id="view-flat" class="toggle-btn active">Flat</button>
+        <button id="view-grouped" class="toggle-btn">Grouped</button>
+      </div>
+    </div>
+
+    <div id="type-chips" class="type-chips"></div>
+
+    <main>
+      <div id="spinner" class="spinner-overlay hidden">
+        <div class="spinner"></div>
+        <span>Scanning...</span>
+      </div>
+
+      <table id="results">
+        <thead>
+          <tr>
+            <th class="col-check"><input type="checkbox" id="select-all" /></th>
+            <th class="sortable" data-sort="size">Size <span class="sort-arrow"></span></th>
+            <th class="sortable" data-sort="pm">Type <span class="sort-arrow"></span></th>
+            <th class="sortable" data-sort="path">Path <span class="sort-arrow"></span></th>
+          </tr>
+        </thead>
+        <tbody id="results-body"></tbody>
+      </table>
+
+      <div id="empty-state" class="empty-state hidden">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="40" height="40">
+          <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <p>No disposable artifacts found here.</p>
+      </div>
+    </main>
+
+    <footer>
+      <button id="trash-btn" class="btn-safe" disabled>
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>
+        Move to Trash
+      </button>
+      <button id="archive-btn" class="btn-neutral" disabled>
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 8H3v13h18V8zM1 3h22v5H1zM10 12h4"/></svg>
+        Archive then Delete
+      </button>
+      <button id="permanent-btn" class="btn-danger" disabled>
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg>
+        Delete Permanently
+      </button>
+      <button id="restore-btn" class="btn-neutral">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+        Restore Archive
+      </button>
+      <span id="freed-total" class="freed-total"></span>
+    </footer>
+
+    <!-- Restore panel -->
+    <div id="restore-panel" class="restore-panel hidden">
+      <div class="restore-header">
+        <span>Restore a backup archive</span>
+        <button id="restore-close" class="btn-neutral">✕ Close</button>
+      </div>
+      <div id="restore-list" class="restore-list">
+        <p class="restore-empty">Searching for archives...</p>
+      </div>
     </div>
   </div>
 
-  <div id="type-chips" class="type-chips"></div>
-
-  <main>
-    <div id="spinner" class="spinner-overlay hidden">
+  <!-- ── DOCTOR TAB ── -->
+  <div id="tab-doctor" class="tab-panel hidden">
+    <div class="toolbar">
+      <div class="summary">Ecosystem breakdown for the scanned folder.</div>
+      <button id="doctor-btn" class="btn-safe">Run Doctor</button>
+    </div>
+    <div id="doctor-spinner" class="spinner-overlay hidden">
       <div class="spinner"></div>
-      <span>Scanning...</span>
+      <span>Analysing...</span>
     </div>
-
-    <table id="results">
-      <thead>
-        <tr>
-          <th class="col-check"><input type="checkbox" id="select-all" /></th>
-          <th class="sortable" data-sort="size">Size <span class="sort-arrow"></span></th>
-          <th class="sortable" data-sort="pm">Type <span class="sort-arrow"></span></th>
-          <th class="sortable" data-sort="path">Path <span class="sort-arrow"></span></th>
-        </tr>
-      </thead>
-      <tbody id="results-body"></tbody>
-    </table>
-
-    <div id="empty-state" class="empty-state hidden">
-      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="40" height="40">
-        <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-      <p>No disposable artifacts found here.</p>
+    <div id="doctor-content" class="doctor-content hidden">
+      <div id="doctor-total" class="doctor-total"></div>
+      <table class="doctor-table">
+        <thead>
+          <tr>
+            <th>Ecosystem</th>
+            <th>Count</th>
+            <th>Total</th>
+            <th>Oldest</th>
+            <th>Oldest path</th>
+          </tr>
+        </thead>
+        <tbody id="doctor-body"></tbody>
+      </table>
+      <div id="doctor-biggest" class="doctor-biggest"></div>
     </div>
-  </main>
-
-  <footer>
-    <button id="trash-btn" class="btn-safe" disabled>
-      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>
-      Move to Trash
-    </button>
-    <button id="archive-btn" class="btn-neutral" disabled>
-      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 8H3v13h18V8zM1 3h22v5H1zM10 12h4"/></svg>
-      Archive then Delete
-    </button>
-    <button id="permanent-btn" class="btn-danger" disabled>
-      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg>
-      Delete Permanently
-    </button>
-    <button id="restore-btn" class="btn-neutral">
-      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-      Restore Archive
-    </button>
-    <span id="freed-total" class="freed-total"></span>
-  </footer>
-
-  <!-- Restore panel -->
-  <div id="restore-panel" class="restore-panel hidden">
-    <div class="restore-header">
-      <span>Restore a backup archive</span>
-      <button id="restore-close" class="btn-neutral">✕ Close</button>
-    </div>
-    <div id="restore-list" class="restore-list">
-      <p class="restore-empty">Searching for archives...</p>
+    <div id="doctor-empty" class="empty-state hidden">
+      <p>Click "Run Doctor" to analyse the scanned folder.</p>
     </div>
   </div>
 
+  <!-- ── STATS TAB ── -->
+  <div id="tab-stats" class="tab-panel hidden">
+    <div class="toolbar">
+      <div class="summary">Lifetime deletion history.</div>
+      <button id="stats-btn" class="btn-safe">Refresh</button>
+    </div>
+    <div id="stats-content" class="stats-content hidden">
+      <div id="stats-total" class="stats-total"></div>
+      <table class="doctor-table">
+        <thead>
+          <tr>
+            <th>Ecosystem</th>
+            <th>Deletions</th>
+            <th>Total freed</th>
+            <th>Last deleted</th>
+          </tr>
+        </thead>
+        <tbody id="stats-eco-body"></tbody>
+      </table>
+      <div id="stats-chart" class="stats-chart"></div>
+    </div>
+    <div id="stats-empty" class="empty-state hidden">
+      <p>No deletions recorded yet. Delete something from the Scan tab first.</p>
+    </div>
+  </div>
+
+  <!-- Shared modal -->
   <div id="modal-backdrop" class="modal-backdrop hidden">
     <div class="modal">
       <h2 id="modal-title">Confirm delete</h2>
