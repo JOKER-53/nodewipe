@@ -39,37 +39,7 @@ Ambiguous names like `target`/`build`/`dist` are only matched when a marker
 file confirms the ecosystem (e.g. `target/` next to `Cargo.toml`), so an
 unrelated folder that happens to share the name is never touched.
 
-## Status: MVP scaffold
-
-What's implemented right now:
-- **`core`**: rule-based scanner covering all the artifact types above
-  (adding a new one is a one-line rule, not a rewrite), monorepo/workspace
-  grouping, three delete modes (trash / archive / permanent).
-- **`cli`**: interactive TUI (default when run in a terminal — `↑/↓` move,
-  `space` select, `d` trash, `a` archive, `p` permanent w/ confirmation,
-  `r` rescan, `q` quit), plus `scan`/`delete`/`types` subcommands, a
-  `--exclude-types` filter, and a `--json` (headless/scriptable) output mode.
-- **`gui`**: Tauri desktop app (npkill#186) — search/filter, per-type filter
-  chips, flat and collapsible grouped (monorepo) views, sortable columns,
-  select-all, colored type badges, a real confirmation modal for permanent
-  delete, and toast notifications. Same `nodewipe-core` engine as the CLI.
-- **Distribution scaffolding**: GitHub Actions release workflow, an
-  `install.sh` that asks CLI-only vs CLI+GUI, and an npm shim published as
-  [`@joker53/nodewipe`](https://www.npmjs.com/package/@joker53/nodewipe) — see
-  "Installing" below. The npm package is live; it just has nothing to
-  download yet until the first GitHub Release with built binaries exists.
-
-What's *not* built yet (next steps, see Roadmap):
-- Progress bar during long scans (current TUI/GUI block until the initial scan finishes).
-- Custom app icons for GUI bundling (currently a simple placeholder glyph).
-- Homebrew/Scoop packages, shell completions, self-update command.
-
 ## Installing
-
-The npm shim is already published as [`@joker53/nodewipe`](https://www.npmjs.com/package/@joker53/nodewipe)
-(scoped under a personal npm username — a plain `nodewipe` name was blocked by
-npm's collision check against an existing similarly-named package). Several
-ways to get it, from simplest to most manual:
 
 ```bash
 # 1. npm — downloads the right native binary via postinstall,
@@ -77,9 +47,9 @@ ways to get it, from simplest to most manual:
 npx @joker53/nodewipe
 # or: npm install -g @joker53/nodewipe
 
-# 2. Arch Linux (AUR) — CLI only for now, see packaging/aur/README.md
-yay -S nodewipe-bin
-# or: paru -S nodewipe-bin
+# 2. Arch Linux (AUR)
+yay -S nodewipe
+# or: paru -S nodewipe
 
 # 3. Docker — scan any folder without installing anything
 docker run --rm -v "$PWD":/scan ghcr.io/kadhiravaneg/nodewipe
@@ -89,7 +59,7 @@ docker run --rm -v ~/Projects:/scan ghcr.io/kadhiravaneg/nodewipe scan --json
 docker run --rm -it -v ~/Projects:/scan ghcr.io/kadhiravaneg/nodewipe scan
 
 # 4. Shell installer — asks CLI-only vs CLI+GUI
-curl -fsSL https://raw.githubusercontent.com/KADHIRAVANEG/nodewipe/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/KADHIRAVANEG/nodewipe/main/install.sh | bash
 
 # 5. Manual — grab the binary for your platform from GitHub Releases
 #    https://github.com/KADHIRAVANEG/nodewipe/releases
@@ -98,9 +68,7 @@ curl -fsSL https://raw.githubusercontent.com/KADHIRAVANEG/nodewipe/main/scripts/
 None of these compile anything locally — `.github/workflows/release.yml` builds
 native binaries for Linux/macOS/Windows on every version tag and attaches them
 to a GitHub Release; the npm package and `install.sh` just fetch the matching
-one. **This only works once a tagged release has actually been pushed and
-built.** Until then (or if a build fails for your platform), build from source
-(next section).
+one.
 
 ### Publishing a new release
 
@@ -108,9 +76,10 @@ built.** Until then (or if a build fails for your platform), build from source
 git tag vX.Y.Z
 git push origin vX.Y.Z
 ```
-This triggers the GitHub Actions workflow to build and attach binaries — check
-progress at https://github.com/KADHIRAVANEG/nodewipe/actions. The npm shim only
-needs re-publishing when its own code changes (not on every binary release):
+
+This triggers the GitHub Actions workflow to build and attach binaries. The npm
+shim only needs re-publishing when its own code changes:
+
 ```bash
 cd npm-package
 npm version patch   # or minor/major
@@ -120,7 +89,6 @@ npm publish --access=public
 ## Building from source
 
 ```bash
-cd nodewipe
 cargo build --release
 ./target/release/nodewipe scan
 ```
@@ -128,17 +96,15 @@ cargo build --release
 ## Building the GUI
 
 Requires Node.js/npm in addition to Rust, plus Tauri's native dependencies:
-- **Linux**: `webkit2gtk-4.1`, `libappindicator-gtk3`, `librsvg`, and build
-  tools — see https://v2.tauri.app/start/prerequisites/ for your distro's
-  exact package names (they vary, especially on Arch).
-- **macOS**: Xcode Command Line Tools (`xcode-select --install`).
-- **Windows**: Microsoft C++ Build Tools + WebView2 (usually already present on Win10/11).
+- **Linux**: `webkit2gtk-4.1`, `libappindicator-gtk3`, `librsvg`, and build tools
+- **macOS**: Xcode Command Line Tools (`xcode-select --install`)
+- **Windows**: Microsoft C++ Build Tools + WebView2
 
 ```bash
 cd gui
 npm install
-npm run dev      # launches the app in dev mode with hot reload
-npm run build    # produces a distributable bundle
+npm run dev      # dev mode with hot reload
+npm run build    # distributable bundle
 ```
 
 ## Usage (CLI)
@@ -147,14 +113,28 @@ npm run build    # produces a distributable bundle
 # Interactive TUI (default when run in a terminal)
 nodewipe
 
-# Human-readable scan of the current directory (all artifact types)
+# Scan current directory
 nodewipe scan
 
-# Only show artifacts >= 50MB
-nodewipe scan --min-mb 50
+# Scan a specific directory
+nodewipe scan ~
+nodewipe scan ~/Projects
+
+# Only show artifacts >= 50 MB
+nodewipe scan ~ --min-mb 50
 
 # Group results by monorepo/workspace root
-nodewipe scan --grouped
+nodewipe scan ~ --grouped
+
+# Sort by age — oldest (most abandoned) artifacts float to the top
+nodewipe scan ~ --sort age
+
+# Flag projects whose source files haven't been touched in 60+ days
+nodewipe scan ~ --stale-days 60
+
+# Only show artifacts untouched in 30+ days
+nodewipe scan ~ --older-than 30d
+# Also accepts w(eeks), m(onths ~30d), y(ears ~365d): --older-than 6m
 
 # Skip specific artifact types
 nodewipe scan --exclude-types venv,dist,rust_target
@@ -162,27 +142,89 @@ nodewipe scan --exclude-types venv,dist,rust_target
 # List every supported type and its slug
 nodewipe types
 
-# Launch the desktop GUI (if installed alongside this CLI)
-nodewipe gui
-
 # Scriptable / CI mode
 nodewipe scan --json > report.json
 
-# Delete: safe by default (moves to OS trash), requires --yes for automation
+# Delete: safe by default (moves to OS trash), requires --yes
 nodewipe delete ./apps/foo/node_modules --yes
 
-# Archive before deleting
+# Archive before deleting (creates a .tar.gz backup)
 nodewipe delete ./apps/foo/node_modules --mode archive --yes
 
-# Only show artifacts untouched in 30+ days — surfaces abandoned projects
-nodewipe scan --older-than 30d
-# Also accepts w(eeks), m(onths, ~30d), y(ears, ~365d): --older-than 6m, --older-than 1y
-
-# Preview only
+# Preview only — no changes made
 nodewipe delete ./apps/foo/node_modules --dry-run
 
 # Restore a backup created by --mode archive
 nodewipe restore ./apps/foo/foo-node_modules-backup.tar.gz
+
+# Launch the desktop GUI
+nodewipe gui
+```
+
+## Analysis commands
+
+### `nodewipe doctor`
+
+Scans your system and gives a full breakdown of disk usage by ecosystem —
+how many Rust `target/` folders, Python venvs, etc., how much space each
+ecosystem takes in total, and which artifact is the oldest (most abandoned).
+
+```bash
+nodewipe doctor ~
+```
+
+Example output:
+```
+🩺  nodewipe doctor — scanning /home/user …
+
+ Total reclaimable: 16.0 GB across 90 artifact directories
+
+ Ecosystem               Count        Total   Oldest      Oldest path
+ ────────────────────────────────────────────────────────────────────────────────
+ Cargo target                2      13.7 GB   51 days     ~/npkill-rs/target
+ Python venv                 4       1.7 GB   82 days     ~/Downloads/.../venv
+ node_modules                6     491.7 MB   69 days     ~/fortisim/.../node_modules
+ Go build cache              1      70.0 MB   32 days     ~/.cache/go-build
+ __pycache__                75       4.1 MB   121 days    ~/Downloads/.../__pycache__
+
+ Top space consumers:
+   12.3 GB  (51d ago)  ~/npkill-rs/target
+   1.6 GB   (1d ago)   ~/CRISPR/.venv
+   1.4 GB   (35d ago)  ~/linuxpet/target
+
+ 💡 Next steps:
+    nodewipe scan --older-than 90d
+    nodewipe delete <path> --mode trash
+```
+
+### `nodewipe stats`
+
+Shows a dashboard of how much disk space you have freed over time, broken
+down by ecosystem, with a bar chart of the last 30 days. History is stored
+in `~/.local/share/nodewipe/history.json`.
+
+```bash
+nodewipe stats
+```
+
+Example output:
+```
+📊  nodewipe stats — lifetime savings
+
+ Total freed:  23.7 GB   across 63 deletions
+
+ By ecosystem:
+ ────────────────────────────────────────────────────────
+  node_modules          31     340.2 MB   last: today
+  rust_target           12      14.2 GB   last: 3 days ago
+  python_venv            9       2.1 GB   last: 14 days ago
+
+ Last 30 days:
+  2026-08-20  ████████████████  2.1 GB (4 deletions)
+  2026-08-23  ████              512 MB (1 deletion)
+  2026-08-27  ████████████████████████  340.2 MB (1 deletion)
+
+ All-time total: 16.5 GB
 ```
 
 ## Persistent config
@@ -190,9 +232,7 @@ nodewipe restore ./apps/foo/foo-node_modules-backup.tar.gz
 ### `.nodewipeignore`
 
 Drop a `.nodewipeignore` file in a scan root (or `~/.nodewipeignore` for a
-global rule set that applies everywhere) to permanently skip specific paths
-without typing `--exclude-types` every time. One pattern per line; `#`
-starts a comment:
+global rule set) to permanently skip specific paths:
 
 ```
 # .nodewipeignore
@@ -200,32 +240,44 @@ legacy-project
 apps/keep-this-one/node_modules
 ```
 
-A bare name (`legacy-project`) matches that directory anywhere in the tree;
-a multi-segment path matches as a suffix. Disable ignore-file loading for a
-single run with `--no-ignore-file`.
+A bare name matches that directory anywhere in the tree; a multi-segment
+path matches as a suffix. Disable for a single run with `--no-ignore-file`.
 
 ### Config file
 
-`~/.config/nodewipe/config.toml` (platform-appropriate config dir) sets
-defaults that CLI flags always override:
+`~/.config/nodewipe/config.toml` sets defaults that CLI flags always override:
 
 ```toml
 default_delete_mode = "archive"          # trash | archive | permanent
 default_exclude_types = ["venv", "rust_target"]
 ```
 
+## GUI
+
+The Tauri desktop app (`nodewipe gui`) wraps the same `nodewipe-core` engine
+as the CLI. It has three tabs:
+
+- **🔍 Scan** — search/filter, per-type filter chips, flat and collapsible
+  grouped (monorepo) views, sortable columns, select-all, colored type
+  badges, confirmation modal for permanent delete, toast notifications.
+- **🩺 Doctor** — ecosystem breakdown table and top space consumers for the
+  scanned folder.
+- **📊 Stats** — per-ecosystem deletion history and 30-day bar chart.
+
+All deletions made through the GUI are recorded to the same history file as
+the CLI, so `nodewipe stats` reflects GUI deletions too.
 
 ## Issue-to-fix mapping (voidcosmos/npkill)
 
 | npkill issue | What this project does differently |
 |---|---|
 | #188 no headless/scriptable mode | `--json` output + `--yes`/`--dry-run` flags + proper exit codes |
-| #199 / #191 nested directory bugs | Scanner prunes recursion only at matched `node_modules`; sibling branches are never affected (see comments in `core/src/scanner.rs`) |
+| #199 / #191 nested directory bugs | Scanner prunes recursion only at matched artifact; sibling branches are never affected |
 | #104 no grouped/collapsed view | `workspace::group_by_workspace` groups by detected monorepo root |
 | #172 / #121 slow scan/delete | `rayon`-parallel directory walk and parallel size computation |
 | #60 no trash/undo | `DeleteMode::Trash` moves to OS trash instead of unlinking |
 | #46 no archive option | `DeleteMode::Archive` tars+gzips before removing |
-| #75 pnpm/Windows issues | Package manager detected from lockfile; `.pnpm` treated as part of one deletable unit, not a nested result |
+| #75 pnpm/Windows issues | Package manager detected from lockfile; `.pnpm` treated as part of one deletable unit |
 | #186 no desktop app | `gui/` — Tauri app wrapping the same `nodewipe-core` engine |
 
 ## Roadmap
@@ -236,45 +288,73 @@ default_exclude_types = ["venv", "rust_target"]
 4. ✅ Multi-ecosystem support (Python, Rust, Java, JS build caches), risk warnings
 5. ✅ Prebuilt binaries/installers via GitHub Actions for macOS/Linux/Windows, npm shim, `install.sh`
 6. ✅ `.nodewipeignore`, `~/.config/nodewipe/config.toml`, `restore`, `--older-than` age filtering
-7. ✅ AUR package scaffold (`packaging/aur/`) ready to publish; Homebrew tap + Scoop/winget still open
-8. Shell completions (bash/zsh/fish) + man page
-9. Self-update command; GUI settings persistence (last root, view mode, sort) + running total stats
-10. Benchmark suite vs. npkill on a large monorepo fixture, published in README
+7. ✅ AUR package (`nodewipe`), npm package (`@joker53/nodewipe`)
+8. ✅ `nodewipe doctor` — ecosystem analysis and disk-hog report
+9. ✅ `nodewipe stats` — lifetime deletion dashboard with history tracking
+10. ✅ Last-used sorting (`--sort age`) and stale project detection (`--stale-days`)
+11. ✅ GUI Doctor and Stats tabs
+12. Shell completions (bash/zsh/fish) + man page
+13. Self-update command; Homebrew tap + Scoop/winget packages
+14. Benchmark suite vs. npkill on a large monorepo fixture
 
 ## Project layout
 
 ```
 nodewipe/
-├── core/     # nodewipe-core: engine, no I/O with the user — reusable by CLI and GUI
-├── cli/      # nodewipe-cli: binary, argument parsing, output formatting, TUI
-└── gui/      # nodewipe-gui: Tauri desktop app (src-tauri/ = Rust backend, rest = frontend)
+├── core/          # nodewipe-core: engine — scanner, deleter, history, doctor, stale detection
+├── cli/           # nodewipe-cli: argument parsing, output formatting, TUI
+├── gui/           # nodewipe-gui: Tauri desktop app
+│   ├── src-tauri/ # Rust backend (Tauri commands)
+│   └── web/       # Vanilla JS + CSS frontend
+├── npm-package/   # npm shim — downloads the right native binary on install
+├── packaging/
+│   └── aur/       # Arch Linux AUR PKGBUILD
+└── docker/        # Docker image
 ```
 
-## Chart
+## Architecture
+
 ```mermaid
 flowchart TD
-    %% Styling Definitions
-    classDef entry fill:#2c3e50,stroke:#34495e,stroke-width:2px,color:#fff;
-    classDef logic fill:#2980b9,stroke:#fff,color:#fff;
-    classDef action fill:#27ae60,stroke:#fff,color:#fff;
-    classDef config fill:#f1c40f,stroke:#f39c12,stroke-width:2px,color:#000;
+    classDef engine fill:#2c3e50,stroke:#34495e,color:#fff
+    classDef cli fill:#2980b9,stroke:#fff,color:#fff
+    classDef gui fill:#8e44ad,stroke:#fff,color:#fff
+    classDef output fill:#27ae60,stroke:#fff,color:#fff
+    classDef config fill:#f1c40f,stroke:#f39c12,color:#000
 
-    %% Entry Point
-    CLI[User Execution: nodewipe]:::entry
-    
-    %% Input/Discovery Phase
-    CLI --> Discovery{Search for Targets}
-    Discovery --> FileTree[Traverse Directory Tree]:::logic
-    FileTree --> Match{Is node_modules?}:::logic
-    
-    %% Processing Phase
-    Match -- Yes --> Action[Delete/Purge Directory]:::action
-    Match -- No --> Skip[Ignore]
-    
-    %% Result/Reporting
-    Action --> Stats[Collect Deletion Stats]:::logic
-    Stats --> Report[Print Summary Report]:::action
+    Core["nodewipe-core
+    ─────────────
+    scanner · deleter
+    history · doctor
+    stale detection
+    workspace grouping"]:::engine
 
-    %% Config Handling
-    Config[Configuration/CLI Flags]:::config -.-> Discovery
+    CLI["nodewipe-cli
+    ─────────────
+    scan · delete · restore
+    doctor · stats · types
+    TUI · --json mode"]:::cli
+
+    GUI["nodewipe-gui
+    ─────────────
+    Scan tab
+    Doctor tab
+    Stats tab"]:::gui
+
+    Config["config.toml
+    .nodewipeignore"]:::config
+
+    HistFile["~/.local/share/nodewipe/
+    history.json"]:::output
+
+    Disk["Filesystem"]:::output
+
+    Config -.-> CLI
+    Config -.-> Core
+    CLI --> Core
+    GUI --> Core
+    Core --> Disk
+    Core --> HistFile
+    CLI --> HistFile
+    GUI --> HistFile
 ```
