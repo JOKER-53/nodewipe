@@ -43,7 +43,7 @@ struct App {
     modal_text: Option<(String, Vec<String>, bool)>,
     excluded_kinds: HashSet<ArtifactKind>,
     filter_cursor: usize,
-    ignore_patterns: Vec<String>,
+    ignore_patterns: nodewipe_core::Gitignore,
     /// Spinner frame counter (incremented each draw while scanning).
     spinner_tick: usize,
     /// Scan start time — used to show elapsed time in the spinner.
@@ -105,7 +105,7 @@ impl App {
             let opts = ScanOptions {
                 root: root.clone(),
                 exclude_kinds,
-                ignore_patterns,
+                ignore_patterns: ignore_patterns.clone(),
                 ..Default::default()
             };
             match scan(&opts) {

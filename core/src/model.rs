@@ -236,7 +236,7 @@ pub struct ScanOptions {
     /// Patterns loaded from `.nodewipeignore` (see `ignorefile` module).
     /// Any path matching one of these is skipped entirely, whether or not
     /// it would otherwise be classified as an artifact.
-    pub ignore_patterns: Vec<String>,
+    pub ignore_patterns: ignore::gitignore::Gitignore,
     /// If false, only paths and metadata are returned without computing directory sizes
     /// (much faster first pass; sizes can be filled in lazily/incrementally by the caller).
     pub compute_sizes: bool,
@@ -267,7 +267,7 @@ impl Default for ScanOptions {
                 "site-packages".into(), // lives inside a venv; venv itself is the unit
             ],
             exclude_kinds: Vec::new(),
-            ignore_patterns: Vec::new(),
+            ignore_patterns: ignore::gitignore::Gitignore::empty(),
             compute_sizes: true,
         }
     }

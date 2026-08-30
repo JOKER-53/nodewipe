@@ -157,6 +157,9 @@ nodewipe delete ./apps/foo/node_modules --dry-run
 # Restore a backup created by --mode archive
 nodewipe restore ./apps/foo/foo-node_modules-backup.tar.gz
 
+# Generate shell completions (e.g. bash, zsh, fish, powershell)
+nodewipe completions bash > ~/.local/share/bash-completion/completions/nodewipe
+
 # Launch the desktop GUI
 nodewipe gui
 ```
@@ -232,16 +235,17 @@ Example output:
 ### `.nodewipeignore`
 
 Drop a `.nodewipeignore` file in a scan root (or `~/.nodewipeignore` for a
-global rule set) to permanently skip specific paths:
+global rule set) to permanently skip specific paths. This file supports standard
+`.gitignore` glob syntax (powered by the standard `ignore` crate):
 
 ```
 # .nodewipeignore
-legacy-project
-apps/keep-this-one/node_modules
+legacy-project/
+apps/**/node_modules
+!apps/keep-this-one/node_modules
 ```
 
-A bare name matches that directory anywhere in the tree; a multi-segment
-path matches as a suffix. Disable for a single run with `--no-ignore-file`.
+Disable for a single run with `--no-ignore-file`.
 
 ### Config file
 
@@ -293,9 +297,10 @@ the CLI, so `nodewipe stats` reflects GUI deletions too.
 9. ✅ `nodewipe stats` — lifetime deletion dashboard with history tracking
 10. ✅ Last-used sorting (`--sort age`) and stale project detection (`--stale-days`)
 11. ✅ GUI Doctor and Stats tabs
-12. Shell completions (bash/zsh/fish) + man page
-13. Self-update command; Homebrew tap + Scoop/winget packages
-14. Benchmark suite vs. npkill on a large monorepo fixture
+12. ✅ Shell completions (bash/zsh/fish/powershell)
+13. ✅ Self-update check and automatic download for prebuilt binaries
+14. Homebrew tap + Scoop/winget packages
+15. Benchmark suite vs. npkill on a large monorepo fixture
 
 ## Project layout
 

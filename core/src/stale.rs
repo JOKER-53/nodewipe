@@ -109,21 +109,26 @@ fn youngest_source_file_mtime(root: &Path, artifact_path: &Path) -> Option<Syste
                 continue;
             }
 
-            // Skip hidden dirs (`.git`, `.github`, etc.) — git internals would
-            // dominate the mtime signal.
-            if path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .map(|n| n.starts_with('.'))
-                .unwrap_or(false)
-            {
-                continue;
-            }
-
             let meta = match entry.metadata() {
                 Ok(m) => m,
                 Err(_) => continue,
             };
+
+            // Skip version control internals like `.git` — their mtimes would
+            // dominate the signal. Do NOT skip hidden files (like `.env`) or
+            // other hidden source dirs (like `.github` or `.vscode`).
+            let is_hidden = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .map(|n| n.starts_with('.'))
+                .unwrap_or(false);
+
+            if is_hidden && meta.is_dir() {
+                let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                if name == ".git" || name == ".svn" || name == ".hg" {
+                    continue;
+                }
+            }
 
             if meta.is_dir() {
                 walk(&path, artifact, depth - 1, youngest);
