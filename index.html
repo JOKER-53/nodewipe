@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>nodewipe - Reclaim Your Disk Space</title>
+    <title>nodewipe - Precision Developer Environment Cleaner</title>
     <meta name="description" content="Blazingly fast, multi-ecosystem dev-environment cleaner. Find and delete stray node_modules, Rust targets, Python venvs, and more.">
     <link rel="stylesheet" href="styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -11,18 +11,22 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="glow-bg"></div>
-    <div class="glow-bg glow-bg-2"></div>
+    <!-- Animated background grid and lines -->
+    <div class="grid-bg"></div>
+    <svg class="flow-lines" xmlns="http://www.w3.org/2000/svg">
+        <path class="animated-path" d="M 0,200 C 300,200 400,100 800,100 C 1200,100 1500,300 2000,300" fill="none" stroke="rgba(139, 92, 246, 0.4)" stroke-width="1.5" />
+        <path class="animated-path reverse" d="M 0,500 C 400,500 500,400 900,400 C 1300,400 1600,600 2000,600" fill="none" stroke="rgba(59, 130, 246, 0.4)" stroke-width="1.5" />
+    </svg>
     
     <nav class="navbar">
         <div class="nav-content">
             <div class="logo">
-                <span class="logo-icon">🗑️</span>
-                nodewipe
+                <img src="logo.svg" alt="nodewipe" width="28" height="28" class="logo-img">
+                <span class="logo-text">nodewipe</span>
             </div>
             <div class="nav-links">
-                <a href="https://github.com/KADHIRAVANEG/nodewipe" target="_blank" class="github-link">
-                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg>
+                <a href="https://github.com/KADHIRAVANEG/nodewipe" target="_blank" class="nav-item">
+                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg>
                     GitHub
                 </a>
             </div>
@@ -31,104 +35,109 @@
 
     <main>
         <section class="hero fade-in">
-            <div class="hero-badge">v0.6.0 is out now! ✨</div>
+            <div class="pill-badge">
+                <span class="indicator"></span> v0.6.0 Available
+            </div>
             <h1 class="hero-title">
-                Reclaim your<br>
-                <span class="gradient-text">disk space.</span>
+                Code base cleanups,<br>
+                engineered with <span class="accent-text">precision.</span>
             </h1>
             <p class="hero-subtitle">
-                A blazingly fast, multi-ecosystem cleaner. Say goodbye to gigabytes of abandoned <code>node_modules</code>, Python <code>venv</code>s, Rust <code>target/</code> folders, and build caches.
+                A blazingly fast, multi-ecosystem artifact cleaner. Seamlessly reclaim space from orphaned <code>node_modules</code>, <code>target/</code>, and Python <code>venv</code>s with a surgical CLI & Desktop app.
             </p>
             
-            <div class="install-box">
-                <div class="install-box-header">
-                    <div class="mac-dots">
-                        <span></span><span></span><span></span>
-                    </div>
-                    <div class="install-box-title">Terminal</div>
-                </div>
-                <div class="install-box-body">
-                    <span class="prompt">$</span>
+            <div class="install-block">
+                <div class="cmd-line">
+                    <span class="prompt">~</span>
                     <span class="command">npx @joker53/nodewipe</span>
-                    <button class="copy-btn" id="copyBtn" title="Copy to clipboard">
-                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                    </button>
                 </div>
+                <button class="copy-btn" id="copyBtn" title="Copy to clipboard">
+                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                </button>
             </div>
 
             <div class="hero-cta">
-                <a href="https://github.com/KADHIRAVANEG/nodewipe#installing" class="btn btn-primary">Other Install Methods</a>
-                <a href="#features" class="btn btn-secondary">Learn More</a>
+                <a href="#bento" class="btn btn-primary">Explore Platform</a>
             </div>
         </section>
 
-        <section id="features" class="features-section">
-            <div class="features-grid">
-                <div class="feature-card slide-up">
-                    <div class="feature-icon">🚀</div>
-                    <h3>Blazingly Fast</h3>
-                    <p>Powered by Rust and Rayon multi-threading. Scans millions of files in milliseconds without breaking a sweat.</p>
-                </div>
-                <div class="feature-card slide-up" style="animation-delay: 0.1s;">
-                    <div class="feature-icon">🌐</div>
-                    <h3>Multi-Ecosystem</h3>
-                    <p>Doesn't just stop at Node.js. Cleans Python venvs, Rust Cargo targets, Java Maven/Gradle builds, and Next.js/Turborepo caches.</p>
-                </div>
-                <div class="feature-card slide-up" style="animation-delay: 0.2s;">
-                    <div class="feature-icon">🛡️</div>
-                    <h3>Safe by Default</h3>
-                    <p>Never deletes silently. Moves files to your OS Trash by default, or safely compresses them into <code>.tar.gz</code> archives you can restore later.</p>
-                </div>
-                <div class="feature-card slide-up" style="animation-delay: 0.3s;">
-                    <div class="feature-icon">🖥️</div>
-                    <h3>Desktop GUI</h3>
-                    <p>Prefer pointing and clicking? Comes with a beautiful, fully-featured desktop app built with Tauri. Scan, filter, and delete with ease.</p>
-                </div>
-                <div class="feature-card slide-up" style="animation-delay: 0.4s;">
-                    <div class="feature-icon">📊</div>
-                    <h3>Doctor & Stats</h3>
-                    <p>Analyze your system to find out which ecosystem is hogging the most space, and view a dashboard of your lifetime disk space savings.</p>
-                </div>
-                <div class="feature-card slide-up" style="animation-delay: 0.5s;">
-                    <div class="feature-icon">⚡</div>
-                    <h3>Auto-Updating</h3>
-                    <p>Built-in self-updater and shell completions generation. Always stay on the latest version effortlessly.</p>
-                </div>
-            </div>
-        </section>
-        
-        <section class="demo-section fade-in">
-            <div class="demo-container">
-                <div class="demo-header">
-                    <h2>Beautiful Terminal UI</h2>
-                    <p>Navigate and select folders to delete using an intuitive keyboard-driven interface.</p>
-                </div>
-                <div class="demo-mockup">
-                    <div class="install-box-header">
-                        <div class="mac-dots"><span></span><span></span><span></span></div>
-                    </div>
-                    <div class="demo-body">
-                        <pre><code><span class="text-gray">Scanning ~/Projects...</span>
-<span class="text-green">✔ Found 90 artifact directories (16.0 GB reclaimable)</span>
-
-[ ] 12.3 GB  Cargo target    ~/Projects/npkill-rs/target
-[x] 1.6 GB   Python venv     ~/Projects/CRISPR/.venv
-[x] 491.7 MB node_modules    ~/Projects/fortisim/node_modules
-[ ] 70.0 MB  Go build cache  ~/.cache/go-build
-
-<span class="text-gray">Use Space to select, Enter to delete (mode: trash)</span></code></pre>
+        <!-- Bento Box Style Features Grid -->
+        <section id="bento" class="bento-section fade-in">
+            <div class="bento-grid">
+                
+                <div class="bento-card col-span-2 bento-tech">
+                    <div class="card-inner">
+                        <div class="card-header">
+                            <span class="card-icon">⚡</span>
+                            <h3>Rayon-Powered Engine</h3>
+                        </div>
+                        <p>Rust-based multithreaded directory traversal. Analyzes millions of files and computes disk-usage footprints concurrently in milliseconds.</p>
+                        <div class="tech-visual">
+                            <div class="thread-line"></div>
+                            <div class="thread-line"></div>
+                            <div class="thread-line"></div>
+                            <div class="thread-line"></div>
+                        </div>
                     </div>
                 </div>
+
+                <div class="bento-card bento-languages">
+                    <div class="card-inner">
+                        <div class="card-header">
+                            <span class="card-icon">🌐</span>
+                            <h3>Ecosystem Agnostic</h3>
+                        </div>
+                        <p>Intelligent marker detection. Never deletes an ambiguous <code>dist/</code> unless a <code>package.json</code> sits beside it.</p>
+                        <div class="lang-tags">
+                            <span class="tag">Rust</span>
+                            <span class="tag">Node</span>
+                            <span class="tag">Python</span>
+                            <span class="tag">Java</span>
+                            <span class="tag">Go</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bento-card bento-ui col-span-2">
+                    <div class="card-inner">
+                        <div class="card-header">
+                            <span class="card-icon">🖥️</span>
+                            <h3>Desktop & Terminal UI</h3>
+                        </div>
+                        <p>Keyboard-driven Ratatui terminal interface, or a full-fledged Tauri desktop GUI. Complete visibility before you hit delete.</p>
+                        <div class="ui-mockup">
+                            <code>[ ] 12.3 GB  Cargo target    ~/Projects/npkill-rs/target</code><br>
+                            <code>[x] 1.6 GB   Python venv     ~/Projects/CRISPR/.venv</code><br>
+                            <code>[x] 491.7 MB node_modules    ~/Projects/fortisim/node_modules</code>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bento-card bento-safety">
+                    <div class="card-inner">
+                        <div class="card-header">
+                            <span class="card-icon">🛡️</span>
+                            <h3>Zero-Risk Excision</h3>
+                        </div>
+                        <p>Moves artifacts to OS Trash by default. Supports atomic <code>.tar.gz</code> archiving if you need an emergency undo.</p>
+                    </div>
+                </div>
+
             </div>
         </section>
     </main>
 
     <footer>
-        <p>Built with 🦀 Rust. Released under the MIT License.</p>
-        <div class="footer-links">
-            <a href="https://github.com/KADHIRAVANEG/nodewipe">GitHub</a>
-            <a href="https://npmjs.com/package/@joker53/nodewipe">NPM</a>
-            <a href="https://aur.archlinux.org/packages/nodewipe">AUR</a>
+        <div class="footer-content">
+            <div class="footer-brand">
+                <img src="logo.svg" alt="nodewipe" width="24" height="24">
+                <span>nodewipe</span>
+            </div>
+            <div class="footer-links">
+                <a href="https://github.com/KADHIRAVANEG/nodewipe">GitHub</a>
+                <a href="https://npmjs.com/package/@joker53/nodewipe">NPM</a>
+                <a href="https://aur.archlinux.org/packages/nodewipe">AUR</a>
+            </div>
         </div>
     </footer>
 

@@ -1,13 +1,17 @@
 # Nodewipe
 
-```
- _   _           _    __        ___            
-| \ | | ___   __| | __\ \      / (_)_ __   ___ 
-|  \| |/ _ \ / _` |/ _ \ \ /\ / /| | '_ \ / _ \
-| |\  | (_) | (_| |  __/\ V  V / | | |_) |  __/
-|_| \_|\___/ \__,_|\___| \_/\_/  |_| .__/ \___|
-                                   |_|         
-```
+<div align="center">
+  <img src="logo.svg" alt="nodewipe logo" width="120" height="120">
+  
+  ```
+   _   _           _    __        ___            
+  | \ | | ___   __| | __\ \      / (_)_ __   ___ 
+  |  \| |/ _ \ / _` |/ _ \ \ /\ / /| | '_ \ / _ \
+  | |\  | (_) | (_| |  __/\ V  V / | | |_) |  __/
+  |_| \_|\___/ \__,_|\___| \_/\_/  |_| .__/ \___|
+                                     |_|         
+  ```
+</div>
 
 A Rust dev-environment cleanup tool. Started as a reimagining of
 [npkill](https://github.com/voidcosmos/npkill) (see the issue-to-fix mapping
