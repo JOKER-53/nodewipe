@@ -356,14 +356,7 @@ footer {
     color: var(--text-main);
 }
 
-.fade-in {
-    opacity: 0;
-    animation: fadeIn 1s ease-out forwards;
-}
 
-@keyframes fadeIn {
-    to { opacity: 1; }
-}
 
 /* Buttons */
 .btn-primary {
