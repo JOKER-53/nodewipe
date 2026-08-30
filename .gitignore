@@ -7,3 +7,8 @@ Cargo.lock.bak
 .vscode/
 core.*
 *.core
+node_modules/
+dist/
+gui/dist/
+gui/src-tauri/target/
+cli/assets/

@@ -1,6 +1,7 @@
 mod cmd_doctor;
 mod cmd_stats;
 mod tui;
+mod update;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand, ValueEnum};
@@ -124,6 +125,13 @@ enum Command {
         #[arg(value_name = "PATH")]
         path: Option<PathBuf>,
     },
+    /// Generate shell completions for the given shell.
+    ///
+    /// Example: nodewipe completions bash > ~/.local/share/bash-completion/completions/nodewipe
+    Completions {
+        #[arg(value_enum)]
+        shell: clap_complete::Shell,
+    },
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -173,7 +181,11 @@ fn run(cli: Cli) -> Result<ExitCode> {
     exclude_kinds.sort_by_key(|k| k.slug());
     exclude_kinds.dedup_by_key(|k| k.slug());
 
-    let ignore_patterns = if cli.no_ignore_file { Vec::new() } else { load_ignore_patterns(&root) };
+    let ignore_patterns = if cli.no_ignore_file { nodewipe_core::Gitignore::empty() } else { load_ignore_patterns(&root) };
+
+    if !cli.json && atty_stdout() {
+        let _ = update::check_and_prompt_update();
+    }
 
     match cli.command {
         None => {
@@ -201,6 +213,12 @@ fn run(cli: Cli) -> Result<ExitCode> {
         }
         Some(Command::Stats { days, path: _ }) => {
             cmd_stats::run(cli.json, days)
+        }
+        Some(Command::Completions { shell }) => {
+            use clap::CommandFactory;
+            let mut cmd = Cli::command();
+            clap_complete::generate(shell, &mut cmd, "nodewipe", &mut std::io::stdout());
+            Ok(ExitCode::SUCCESS)
         }
     }
 }
@@ -270,7 +288,7 @@ fn cmd_scan(
     min_mb: u64,
     grouped: bool,
     exclude_kinds: Vec<ArtifactKind>,
-    ignore_patterns: Vec<String>,
+    ignore_patterns: nodewipe_core::Gitignore,
     older_than: Option<String>,
     sort: SortKey,
     stale_days: Option<u64>,
@@ -508,28 +526,7 @@ fn cmd_gui() -> Result<ExitCode> {
 }
 
 fn dir_size_quick(path: &PathBuf) -> u64 {
-    walkdir_size(path)
-}
-
-fn walkdir_size(path: &PathBuf) -> u64 {
-    use std::fs;
-    fn walk(p: &std::path::Path, total: &mut u64) {
-        if let Ok(entries) = fs::read_dir(p) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if let Ok(meta) = entry.metadata() {
-                    if meta.is_dir() {
-                        walk(&path, total);
-                    } else {
-                        *total += meta.len();
-                    }
-                }
-            }
-        }
-    }
-    let mut total = 0;
-    walk(path, &mut total);
-    total
+    nodewipe_core::scanner::dir_size(path)
 }
 
 fn kind_display(e: &Entry) -> String {

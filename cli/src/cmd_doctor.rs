@@ -27,11 +27,12 @@ use nodewipe_core::{
     scan,
     ArtifactKind,
     ScanOptions,
+    Gitignore,
 };
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-pub fn run(root: PathBuf, json: bool, exclude_kinds: Vec<ArtifactKind>, ignore_patterns: Vec<String>) -> Result<ExitCode> {
+pub fn run(root: PathBuf, json: bool, exclude_kinds: Vec<ArtifactKind>, ignore_patterns: Gitignore) -> Result<ExitCode> {
     if !json {
         eprintln!("\n 🩺  nodewipe doctor — scanning {} …\n", root.display());
         eprintln!(" This may take a moment on large trees.\n");

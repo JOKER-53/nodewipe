@@ -22,33 +22,6 @@ pub struct DeleteResult {
     pub freed_bytes: u64,
 }
 
-/// Every directory name a known `ArtifactKind` can appear as. Used as a
-/// safety allowlist so `delete()` never removes a directory that merely
-/// happens to have been passed in by mistake (e.g. a typo'd path from a
-/// script) — it must actually look like one of the artifact kinds nodewipe
-/// itself would have detected.
-const DELETABLE_NAMES: &[&str] = &[
-    "node_modules",
-    "venv",
-    ".venv",
-    "__pycache__",
-    ".pytest_cache",
-    ".mypy_cache",
-    ".ruff_cache",
-    "target",
-    "build",
-    ".next",
-    ".turbo",
-    "dist",
-    // Go
-    "mod",
-    "go-build",
-    // PHP
-    "vendor",
-    // .NET
-    "bin",
-    "obj",
-];
 
 /// Deletes `path` (expected to be one of nodewipe's known disposable artifact
 /// directories) according to `mode`. Returns enough info for the caller to
@@ -59,8 +32,7 @@ pub fn delete(path: &Path, mode: DeleteMode, size_bytes: u64) -> Result<DeleteRe
         anyhow::bail!("path does not exist: {}", path.display());
     }
 
-    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-    if !DELETABLE_NAMES.contains(&name) {
+    if crate::scanner::classify_path(path).is_none() {
         anyhow::bail!(
             "refusing to delete a directory that doesn't look like a known disposable artifact: {}",
             path.display()
@@ -153,6 +125,20 @@ pub fn restore(archive_path: &Path) -> Result<PathBuf> {
     }
     let restored_name = restored_name
         .ok_or_else(|| anyhow::anyhow!("archive is empty or has an unexpected layout: {}", archive_path.display()))?;
+
+    const VALID_ARTIFACT_NAMES: &[&str] = &[
+        "node_modules", "venv", ".venv", "__pycache__", ".pytest_cache",
+        ".mypy_cache", ".ruff_cache", "target", "build", ".next", ".turbo",
+        "dist", "mod", "go-build", "vendor", "bin", "obj",
+    ];
+
+    if !VALID_ARTIFACT_NAMES.contains(&restored_name.as_str()) {
+        anyhow::bail!(
+            "refusing to restore: archive contains an unexpected top-level directory name '{}'",
+            restored_name
+        );
+    }
+
     let restored_path = dest_dir.join(&restored_name);
 
     if restored_path.exists() {

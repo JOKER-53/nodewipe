@@ -226,7 +226,7 @@ fn build_entry(path: &Path, kind: ArtifactKind, compute_sizes: bool) -> Entry {
 
 /// Sums file sizes under `path` in parallel. Symlinks are not followed, to
 /// avoid double-counting.
-fn dir_size(path: &Path) -> u64 {
+pub fn dir_size(path: &Path) -> u64 {
     WalkDir::new(path)
         .follow_links(false)
         .into_iter()
