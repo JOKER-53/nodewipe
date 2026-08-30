@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <meta name="color-scheme" content="dark">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>nodewipe - Precision Developer Environment Cleaner</title>
@@ -21,7 +22,22 @@
     <nav class="navbar">
         <div class="nav-content">
             <div class="logo">
-                <img src="logo.svg" alt="nodewipe" width="28" height="28" class="logo-img">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="28" height="28" class="logo-img">
+                    <defs>
+                        <linearGradient id="logo-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#8b5cf6" />
+                            <stop offset="100%" stop-color="#3b82f6" />
+                        </linearGradient>
+                        <linearGradient id="logo-slash" x1="0%" y1="100%" x2="100%" y2="0%">
+                            <stop offset="0%" stop-color="#ef4444" />
+                            <stop offset="100%" stop-color="#f97316" />
+                        </linearGradient>
+                    </defs>
+                    <path d="M25 35 L45 35 L55 45 L95 45 A5 5 0 0 1 100 50 L100 90 A5 5 0 0 1 95 95 L25 95 A5 5 0 0 1 20 90 L20 40 A5 5 0 0 1 25 35 Z" fill="none" stroke="url(#logo-gradient)" stroke-width="6" stroke-linejoin="round"/>
+                    <rect x="30" y="55" width="20" height="8" rx="2" fill="url(#logo-gradient)" opacity="0.8"/>
+                    <rect x="30" y="70" width="35" height="8" rx="2" fill="url(#logo-gradient)" opacity="0.8"/>
+                    <path d="M15 105 L105 15" stroke="url(#logo-slash)" stroke-width="8" stroke-linecap="round"/>
+                </svg>
                 <span class="logo-text">nodewipe</span>
             </div>
             <div class="nav-links">
@@ -34,7 +50,7 @@
     </nav>
 
     <main>
-        <section class="hero fade-in">
+        <section class="hero">
             <div class="pill-badge">
                 <span class="indicator"></span> v0.6.0 Available
             </div>
@@ -62,7 +78,7 @@
         </section>
 
         <!-- Bento Box Style Features Grid -->
-        <section id="bento" class="bento-section fade-in">
+        <section id="bento" class="bento-section">
             <div class="bento-grid">
                 
                 <div class="bento-card col-span-2 bento-tech">
@@ -130,7 +146,12 @@
     <footer>
         <div class="footer-content">
             <div class="footer-brand">
-                <img src="logo.svg" alt="nodewipe" width="24" height="24">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="24" height="24">
+                    <path d="M25 35 L45 35 L55 45 L95 45 A5 5 0 0 1 100 50 L100 90 A5 5 0 0 1 95 95 L25 95 A5 5 0 0 1 20 90 L20 40 A5 5 0 0 1 25 35 Z" fill="none" stroke="#8b5cf6" stroke-width="6" stroke-linejoin="round"/>
+                    <rect x="30" y="55" width="20" height="8" rx="2" fill="#8b5cf6" opacity="0.8"/>
+                    <rect x="30" y="70" width="35" height="8" rx="2" fill="#8b5cf6" opacity="0.8"/>
+                    <path d="M15 105 L105 15" stroke="#ef4444" stroke-width="8" stroke-linecap="round"/>
+                </svg>
                 <span>nodewipe</span>
             </div>
             <div class="footer-links">
