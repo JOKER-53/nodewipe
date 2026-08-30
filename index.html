@@ -141,6 +141,75 @@
 
             </div>
         </section>
+
+        <!-- Deployment & Availability Section -->
+        <section class="bento-section">
+            <div class="section-header" style="text-align: center; margin-bottom: 3rem;">
+                <h2 style="font-size: 2.5rem; font-weight: 700; letter-spacing: -0.02em;">Deployment & Availability</h2>
+                <p style="color: var(--text-muted); margin-top: 0.5rem;">Available wherever you build software.</p>
+            </div>
+            
+            <div class="bento-grid">
+                <div class="bento-card">
+                    <div class="card-inner">
+                        <div class="card-header">
+                            <span class="card-icon">📦</span>
+                            <h3>NPM Registry</h3>
+                        </div>
+                        <p>A smart JavaScript wrapper that automatically downloads the native Rust binary for your OS.</p>
+                        <code style="background: #000; padding: 0.5rem; border-radius: 4px; display: block; font-size: 0.85rem; color: var(--accent-primary);">npx @joker53/nodewipe</code>
+                    </div>
+                </div>
+
+                <div class="bento-card">
+                    <div class="card-inner">
+                        <div class="card-header">
+                            <span class="card-icon">🐧</span>
+                            <h3>Arch Linux (AUR)</h3>
+                        </div>
+                        <p>Natively packaged for Arch Linux users in the Arch User Repository. Built from source or pre-compiled.</p>
+                        <code style="background: #000; padding: 0.5rem; border-radius: 4px; display: block; font-size: 0.85rem; color: var(--accent-primary);">yay -S nodewipe</code>
+                    </div>
+                </div>
+
+                <div class="bento-card">
+                    <div class="card-inner">
+                        <div class="card-header">
+                            <span class="card-icon">🐳</span>
+                            <h3>Docker</h3>
+                        </div>
+                        <p>Run isolated scans without installing anything on your host machine via GitHub Container Registry.</p>
+                        <code style="background: #000; padding: 0.5rem; border-radius: 4px; display: block; font-size: 0.85rem; color: var(--accent-primary);">docker run --rm -it -v "$PWD":/scan ghcr.io/kadhiravaneg/nodewipe</code>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Credits & Architecture Section -->
+        <section class="bento-section">
+            <div class="bento-grid" style="grid-template-columns: 1fr;">
+                <div class="bento-card">
+                    <div class="card-inner">
+                        <div class="card-header">
+                            <span class="card-icon">🏗️</span>
+                            <h3>Project Architecture & Credits</h3>
+                        </div>
+                        <div style="color: var(--text-muted); font-size: 0.95rem; line-height: 1.8;">
+                            <p style="margin-bottom: 1rem;"><strong style="color: var(--text-main);">nodewipe</strong> started as a Rust-powered reimagining of the legendary <a href="https://github.com/voidcosmos/npkill" style="color: var(--accent-primary); text-decoration: none;">npkill</a>, but quickly evolved into a universal, multi-ecosystem artifact cleaner.</p>
+                            
+                            <p style="margin-bottom: 1rem;">The engine is powered by an incredible open-source stack:</p>
+                            <ul style="list-style-type: none; margin-bottom: 1rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.5rem;">
+                                <li>🦀 <strong style="color: var(--text-main);">Rust</strong> & <strong style="color: var(--text-main);">Rayon</strong> for fearless concurrency.</li>
+                                <li>🖥️ <strong style="color: var(--text-main);">Ratatui</strong> for the keyboard-driven terminal UI.</li>
+                                <li>✨ <strong style="color: var(--text-main);">Tauri</strong> & <strong style="color: var(--text-main);">Vanilla JS</strong> for the lightweight desktop GUI.</li>
+                                <li>🔍 <strong style="color: var(--text-main);">Ignore</strong> for standard `.gitignore` glob parsing.</li>
+                            </ul>
+                            <p>Developed and maintained by <strong style="color: var(--text-main);">KADHIRAVANEG</strong>. Released under the MIT License.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
     </main>
 
     <footer>
