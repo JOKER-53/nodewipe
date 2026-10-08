@@ -46,7 +46,15 @@ document.querySelectorAll(".tab-btn").forEach((btn) => {
   });
 });
 
-// ── Kind labels / badges ──────────────────────────────────────────────────────
+function escapeHtml(str) {
+  if (str == null) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
 
 function renderChips() {
   typeChips.innerHTML = "";
@@ -123,9 +131,9 @@ const KIND_RISK_NOTES = {
 function badgeFor(entry) {
   const label = KIND_LABELS[entry.kind] || entry.kind;
   const cls = KIND_BADGE_CLASS[entry.kind] || "badge-unknown";
-  let html = `<span class="badge ${cls}">${label}</span>`;
+  let html = `<span class="badge ${cls}">${escapeHtml(label)}</span>`;
   if (entry.kind === "node_modules" && entry.package_manager) {
-    html += ` <span class="group-meta">${entry.package_manager}</span>`;
+    html += ` <span class="group-meta">${escapeHtml(entry.package_manager)}</span>`;
   }
   return html;
 }
@@ -227,7 +235,7 @@ function render() {
         <td></td>
         <td colspan="3">
           <span class="group-toggle ${collapsed ? "collapsed" : ""}">▾</span>
-          <span class="group-label">${group.root}</span>
+          <span class="group-label">${escapeHtml(group.root)}</span>
           <span class="group-meta">${groupEntries.length} found · ${humanSize(groupSize)}</span>
         </td>
       `;
@@ -390,11 +398,11 @@ async function runDoctor() {
     for (const eco of report.ecosystems) {
       const oldest = eco.oldest_days != null ? `${eco.oldest_days}d` : "—";
       const oldestPath = eco.oldest_path
-        ? `<span title="${eco.oldest_path}">${truncatePath(eco.oldest_path, 40)}</span>`
+        ? `<span title="${escapeHtml(eco.oldest_path)}">${escapeHtml(truncatePath(eco.oldest_path, 40))}</span>`
         : "—";
       const tr = document.createElement("tr");
       tr.innerHTML = `
-        <td><span class="badge badge-unknown">${eco.label}</span></td>
+        <td><span class="badge badge-unknown">${escapeHtml(eco.label)}</span></td>
         <td>${eco.count}</td>
         <td>${humanSize(eco.total_bytes)}</td>
         <td>${oldest}</td>
@@ -415,7 +423,7 @@ async function runDoctor() {
           return `<div class="doctor-biggest-row">
             <span class="size-cell">${humanSize(b.size_bytes)}</span>
             <span class="group-meta">${age}</span>
-            <span class="path-cell" title="${b.path}">${truncatePath(b.path, 60)}</span>
+            <span class="path-cell" title="${escapeHtml(b.path)}">${escapeHtml(truncatePath(b.path, 60))}</span>
           </div>`;
         }).join("");
     } else {
@@ -457,10 +465,10 @@ async function loadStats() {
         : "—";
       const tr = document.createElement("tr");
       tr.innerHTML = `
-        <td>${eco.kind}</td>
+        <td>${escapeHtml(eco.kind)}</td>
         <td>${eco.count}</td>
         <td>${humanSize(eco.total_bytes)}</td>
-        <td>${lastDate}</td>
+        <td>${escapeHtml(lastDate)}</td>
       `;
       ecoBody.appendChild(tr);
     }
@@ -477,7 +485,7 @@ async function loadStats() {
         recent.map((d) => {
           const barPct = maxBytes > 0 ? Math.max(4, (d.bytes_freed / maxBytes) * 100) : 4;
           return `<div class="chart-row">
-            <span class="chart-date">${d.date}</span>
+            <span class="chart-date">${escapeHtml(d.date)}</span>
             <div class="chart-bar-wrap">
               <div class="chart-bar" style="width:${barPct}%"></div>
             </div>
@@ -590,7 +598,7 @@ async function openRestorePanel() {
       item.className = "restore-item";
       item.innerHTML = `
         <span class="restore-item-size">${humanSize(arc.size_bytes)}</span>
-        <span class="restore-item-path" title="${arc.path}">${arc.path}</span>
+        <span class="restore-item-path" title="${escapeHtml(arc.path)}">${escapeHtml(arc.path)}</span>
         <button class="restore-item-btn">Restore</button>
       `;
       item.querySelector(".restore-item-btn").addEventListener("click", async () => {
@@ -605,7 +613,7 @@ async function openRestorePanel() {
       restoreList.appendChild(item);
     }
   } catch (e) {
-    restoreList.innerHTML = `<p class="restore-empty">Error: ${e}</p>`;
+    restoreList.innerHTML = `<p class="restore-empty">Error: ${escapeHtml(e)}</p>`;
   }
 }
 

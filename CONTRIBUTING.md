@@ -22,18 +22,18 @@ Thank you for your interest in contributing to **nodewipe**!
   ```bash
   git commit -m "feat: add support for new artifact type"
   ```
-5. >git commit -m "feat: add support for new artifact type"
+5. **Push to your fork and submit a Pull Request**.
 
 
 ## Development Setup
 
->Core + CLI: Rust (latest stable)
->GUI: Rust + Node.js + Tauri prerequisites
->Run cargo test and cargo clippy before submitting
+- Core + CLI: Rust (latest stable)
+- GUI: Rust + Node.js + Tauri prerequisites
+- Run `cargo test` and `cargo clippy` before submitting
 
 ## Pull Request Guidelines
 
->Keep PRs focused on a single change
->Add tests for new features
->Update documentation when necessary
->Ensure the code follows Rust idioms
+- Keep PRs focused on a single change
+- Add tests for new features
+- Update documentation when necessary
+- Ensure the code follows Rust idioms

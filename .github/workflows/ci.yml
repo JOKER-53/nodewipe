@@ -1,0 +1,29 @@
+name: ci
+on:
+  push:
+    branches: ["main", "Features"]
+  pull_request:
+    branches: ["main", "Features"]
+
+jobs:
+  test:
+    name: Test & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Rustfmt check
+        run: cargo fmt --all --check
+
+      - name: Cargo check
+        run: cargo check --workspace --all-targets
+
+      - name: Clippy check
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Run tests
+        run: cargo test --workspace

@@ -6,7 +6,7 @@
 use clap::{Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 
-const BANNER: &str = r#"
+pub const BANNER: &str = r#"
  _   _           _    __        ___            
 | \ | | ___   __| | __\ \      / (_)_ __   ___ 
 |  \| |/ _ \ / _` |/ _ \ \ /\ / /| | '_ \ / _ \
@@ -51,7 +51,8 @@ pub struct Cli {
     /// Comma-separated artifact types to skip.
     /// Valid values: node_modules, venv, pycache, pytest_cache, mypy_cache,
     /// ruff_cache, rust_target, maven_target, gradle_build, next_cache,
-    /// turbo_cache, dist.
+    /// turbo_cache, dist, go_mod_cache, go_build_cache, php_vendor,
+    /// dotnet_bin, dotnet_obj.
     #[arg(long, global = true, value_delimiter = ',', value_name = "TYPES")]
     pub exclude_types: Vec<String>,
 

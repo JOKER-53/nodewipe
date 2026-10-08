@@ -5,7 +5,7 @@
 /// `assets/completions/` and `assets/man/` inside the crate directory, which
 /// the AUR PKGBUILD and install.sh can then install to the right system paths.
 use clap::CommandFactory;
-use clap_complete::{generate_to, Shell};
+use clap_complete::{Shell, generate_to};
 use clap_mangen::Man;
 use std::io::Error;
 
@@ -16,9 +16,12 @@ fn main() -> Result<(), Error> {
     // Tell Cargo to re-run this script only when the CLI definition changes.
     println!("cargo:rerun-if-changed=src/cli_def.rs");
 
-    let out_dir = PathBuf::from(
-        std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set"),
-    );
+    let out_dir = match std::env::var_os("NODEWIPE_GEN_ASSETS") {
+        Some(_) => {
+            PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set"))
+        }
+        None => PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR not set")),
+    };
 
     // ── Shell completions ─────────────────────────────────────────────────────
     let completions_dir = out_dir.join("assets").join("completions");
@@ -26,7 +29,13 @@ fn main() -> Result<(), Error> {
 
     let mut cmd = Cli::command();
 
-    for shell in [Shell::Bash, Shell::Zsh, Shell::Fish, Shell::Elvish, Shell::PowerShell] {
+    for shell in [
+        Shell::Bash,
+        Shell::Zsh,
+        Shell::Fish,
+        Shell::Elvish,
+        Shell::PowerShell,
+    ] {
         generate_to(shell, &mut cmd, "nodewipe", &completions_dir)?;
     }
 

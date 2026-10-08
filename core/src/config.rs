@@ -33,7 +33,10 @@ pub fn load_config() -> Config {
         return Config::default();
     };
     toml::from_str(&content).unwrap_or_else(|e| {
-        eprintln!("warning: failed to parse {}: {e} (using defaults)", path.display());
+        eprintln!(
+            "warning: failed to parse {}: {e} (using defaults)",
+            path.display()
+        );
         Config::default()
     })
 }

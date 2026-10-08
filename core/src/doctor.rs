@@ -88,7 +88,7 @@ pub fn build_report(entries: &[Entry]) -> DoctorReport {
 
             // Top 3 biggest for context.
             let mut sorted = group_entries.to_vec();
-            sorted.sort_by(|a, b| b.size_bytes.cmp(&a.size_bytes));
+            sorted.sort_by_key(|b| std::cmp::Reverse(b.size_bytes));
             let biggest = sorted
                 .iter()
                 .take(3)
@@ -119,7 +119,7 @@ pub fn build_report(entries: &[Entry]) -> DoctorReport {
         .collect();
 
     // Biggest ecosystem first.
-    ecosystems.sort_by(|a, b| b.total_bytes.cmp(&a.total_bytes));
+    ecosystems.sort_by_key(|b| std::cmp::Reverse(b.total_bytes));
 
     let total_bytes = ecosystems.iter().map(|e| e.total_bytes).sum();
     let total_count = ecosystems.iter().map(|e| e.count).sum();

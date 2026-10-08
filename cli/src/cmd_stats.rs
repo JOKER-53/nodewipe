@@ -25,7 +25,9 @@
 ///  2026-08-23  ████              512 MB (1 deletion)
 /// ```
 use anyhow::Result;
-use nodewipe_core::history::{daily_totals, history_path, load as history_load, stats_by_ecosystem};
+use nodewipe_core::history::{
+    daily_totals, history_path, load as history_load, stats_by_ecosystem,
+};
 use std::process::ExitCode;
 use std::time::{SystemTime, UNIX_EPOCH};
 

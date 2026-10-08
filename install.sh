@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # nodewipe installer
-# Usage: curl -fsSL https://raw.githubusercontent.com/KADHIRAVANEG/nodewipe/main/scripts/install.sh | bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/KADHIRAVANEG/nodewipe/main/install.sh | bash
 set -euo pipefail
 
 REPO="KADHIRAVANEG/nodewipe"
@@ -31,8 +31,10 @@ detect_platform() {
     CLI_ASSET="nodewipe-macos-aarch64"
   elif [ "$PLATFORM" = "macos" ]; then
     CLI_ASSET="nodewipe-macos-x86_64"
-  else
+  elif [ "$PLATFORM" = "linux" ] && [ "$ARCH" = "x86_64" ]; then
     CLI_ASSET="nodewipe-linux-x86_64"
+  else
+    error "Prebuilt binary for $PLATFORM/$ARCH is not currently available. Please build from source using 'cargo build --release'."
   fi
 }
 

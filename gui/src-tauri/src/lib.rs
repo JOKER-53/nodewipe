@@ -1,30 +1,38 @@
+use nodewipe_core::history::{daily_totals, format_date, now_unix, stats_by_ecosystem};
 use nodewipe_core::{
-    annotate_workspace_roots, delete as core_delete, doctor::build_report,
-    group_by_workspace, history_append, history_load, restore as core_restore,
-    scan as core_scan, DeleteMode, Entry, HistoryEntry, ScanOptions, WorkspaceGroup,
+    DeleteMode, Entry, HistoryEntry, ScanOptions, WorkspaceGroup, annotate_workspace_roots,
+    delete as core_delete, doctor::build_report, group_by_workspace, history_append, history_load,
+    restore as core_restore, scan as core_scan,
 };
-use nodewipe_core::history::{format_date, now_unix, stats_by_ecosystem, daily_totals};
 use std::path::PathBuf;
 use walkdir::WalkDir;
 
 #[tauri::command(async)]
 fn scan_command(root: String) -> Result<Vec<Entry>, String> {
-    let opts = ScanOptions { root: PathBuf::from(root), ..Default::default() };
+    let opts = ScanOptions {
+        root: PathBuf::from(root),
+        ..Default::default()
+    };
     let mut entries = core_scan(&opts).map_err(|e| e.to_string())?;
     annotate_workspace_roots(&mut entries, &opts.root);
-    entries.sort_by(|a, b| b.size_bytes.cmp(&a.size_bytes));
+    entries.sort_by_key(|b| std::cmp::Reverse(b.size_bytes));
     Ok(entries)
 }
 
 #[tauri::command(async)]
 fn scan_grouped_command(root: String) -> Result<Vec<WorkspaceGroup>, String> {
-    let opts = ScanOptions { root: PathBuf::from(root), ..Default::default() };
+    let opts = ScanOptions {
+        root: PathBuf::from(root),
+        ..Default::default()
+    };
     let mut entries = core_scan(&opts).map_err(|e| e.to_string())?;
     annotate_workspace_roots(&mut entries, &opts.root);
     let groups = group_by_workspace(entries);
     let mut groups: Vec<WorkspaceGroup> = groups.into_values().collect();
-    groups.sort_by(|a, b| b.total_size_bytes.cmp(&a.total_size_bytes));
-    for g in &mut groups { g.entries.sort_by(|a, b| b.size_bytes.cmp(&a.size_bytes)); }
+    groups.sort_by_key(|b| std::cmp::Reverse(b.total_size_bytes));
+    for g in &mut groups {
+        g.entries.sort_by_key(|b| std::cmp::Reverse(b.size_bytes));
+    }
     Ok(groups)
 }
 
@@ -37,14 +45,20 @@ struct DeleteOutcome {
 }
 
 #[tauri::command]
-fn delete_command(paths: Vec<String>, mode: String, sizes: Vec<u64>) -> Result<Vec<DeleteOutcome>, String> {
+fn delete_command(
+    paths: Vec<String>,
+    mode: String,
+    sizes: Vec<u64>,
+) -> Result<Vec<DeleteOutcome>, String> {
     let delete_mode = match mode.as_str() {
         "trash" => DeleteMode::Trash,
         "archive" => DeleteMode::Archive,
         "permanent" => DeleteMode::Permanent,
         other => return Err(format!("unknown delete mode: {other}")),
     };
-    if paths.len() != sizes.len() { return Err("paths and sizes must be the same length".into()); }
+    if paths.len() != sizes.len() {
+        return Err("paths and sizes must be the same length".into());
+    }
 
     let mut results = Vec::with_capacity(paths.len());
     for (path_str, size) in paths.into_iter().zip(sizes) {
@@ -90,7 +104,10 @@ fn find_archives_command(root: String) -> Result<Vec<serde_json::Value>, String>
         .filter_map(|e| e.ok())
         .filter(|e| {
             e.file_type().is_file()
-                && e.file_name().to_str().map(|n| n.ends_with("-backup.tar.gz")).unwrap_or(false)
+                && e.file_name()
+                    .to_str()
+                    .map(|n| n.ends_with("-backup.tar.gz"))
+                    .unwrap_or(false)
         })
         .map(|e| {
             let path = e.path().to_string_lossy().to_string();
@@ -119,7 +136,10 @@ fn home_dir_command() -> Result<String, String> {
 
 #[tauri::command(async)]
 fn doctor_command(root: String) -> Result<serde_json::Value, String> {
-    let opts = ScanOptions { root: PathBuf::from(root), ..Default::default() };
+    let opts = ScanOptions {
+        root: PathBuf::from(root),
+        ..Default::default()
+    };
     let entries = core_scan(&opts).map_err(|e| e.to_string())?;
     let report = build_report(&entries);
     serde_json::to_value(report).map_err(|e| e.to_string())

@@ -63,7 +63,7 @@ pub fn find_stale_projects(entries: &[Entry], threshold: Duration) -> Vec<StaleP
     }
 
     // Most-stale first.
-    stale.sort_by(|a, b| b.stale_days.cmp(&a.stale_days));
+    stale.sort_by_key(|b| std::cmp::Reverse(b.stale_days));
     stale
 }
 
@@ -82,12 +82,7 @@ fn youngest_source_file_mtime(root: &Path, artifact_path: &Path) -> Option<Syste
 
     // We do a shallow manual walk (not walkdir) to avoid pulling in the full
     // subtree and to be able to skip artifact directories cleanly.
-    fn walk(
-        dir: &Path,
-        artifact: &Path,
-        depth: usize,
-        youngest: &mut Option<SystemTime>,
-    ) {
+    fn walk(dir: &Path, artifact: &Path, depth: usize, youngest: &mut Option<SystemTime>) {
         if depth == 0 {
             return;
         }
@@ -132,14 +127,14 @@ fn youngest_source_file_mtime(root: &Path, artifact_path: &Path) -> Option<Syste
 
             if meta.is_dir() {
                 walk(&path, artifact, depth - 1, youngest);
-            } else if meta.is_file() {
-                if let Ok(mtime) = meta.modified() {
-                    *youngest = Some(match youngest {
-                        Some(prev) if mtime > *prev => mtime,
-                        Some(prev) => *prev,
-                        None => mtime,
-                    });
-                }
+            } else if meta.is_file()
+                && let Ok(mtime) = meta.modified()
+            {
+                *youngest = Some(match youngest {
+                    Some(prev) if mtime > *prev => mtime,
+                    Some(prev) => *prev,
+                    None => mtime,
+                });
             }
         }
     }

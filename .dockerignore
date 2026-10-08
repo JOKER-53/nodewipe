@@ -9,3 +9,9 @@ packaging/
 *.AppImage
 *.deb
 *.rpm
+core.*
+*.core
+*.tar.gz
+cli/assets/
+gui/dist/
+

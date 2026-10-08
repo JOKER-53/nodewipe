@@ -35,7 +35,12 @@ scans for all of them by default, through one shared engine.
 | Gradle build output | `gradle_build` | `build/` + sibling `build.gradle(.kts)` |
 | Next.js cache | `next_cache` | `.next` |
 | Turborepo cache | `turbo_cache` | `.turbo` |
-| JS bundler output | `dist` | `dist/` + sibling `package.json` |
+| Bundler/build output | `dist` | `dist/` + sibling `package.json`/`pyproject.toml` |
+| Go module cache | `go_mod_cache` | `mod/` + sibling `go.mod`/`go.sum` |
+| Go build cache | `go_build_cache` | `go-build/` |
+| PHP Composer vendor | `php_vendor` | `vendor/` + sibling `composer.json` |
+| .NET binary output | `dotnet_bin` | `bin/` + sibling `*proj` |
+| .NET intermediate output | `dotnet_obj` | `obj/` + sibling `*proj` |
 
 Everything is scanned by default (`nodewipe scan`); opt individual types out
 with `nodewipe --exclude-types venv,dist`, or list them all with `nodewipe types`.

@@ -22,7 +22,6 @@ pub struct DeleteResult {
     pub freed_bytes: u64,
 }
 
-
 /// Deletes `path` (expected to be one of nodewipe's known disposable artifact
 /// directories) according to `mode`. Returns enough info for the caller to
 /// support "undo" for `Trash` (the OS trash already gives undo for free) and
@@ -41,7 +40,8 @@ pub fn delete(path: &Path, mode: DeleteMode, size_bytes: u64) -> Result<DeleteRe
 
     let archive_path = match mode {
         DeleteMode::Trash => {
-            trash::delete(path).with_context(|| format!("failed to move {} to trash", path.display()))?;
+            trash::delete(path)
+                .with_context(|| format!("failed to move {} to trash", path.display()))?;
             None
         }
         DeleteMode::Archive => {
@@ -74,7 +74,10 @@ fn archive_path_for(artifact_path: &Path) -> PathBuf {
         .and_then(|n| n.to_str())
         .unwrap_or("artifact")
         .trim_start_matches('.');
-    let project_name = parent.file_name().and_then(|n| n.to_str()).unwrap_or("project");
+    let project_name = parent
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("project");
     parent.join(format!("{project_name}-{artifact_name}-backup.tar.gz"))
 }
 
@@ -82,7 +85,10 @@ fn create_archive(src_dir: &Path, dest_tar_gz: &Path) -> Result<()> {
     let file = File::create(dest_tar_gz)?;
     let encoder = flate2::write::GzEncoder::new(file, flate2::Compression::fast());
     let mut builder = tar::Builder::new(encoder);
-    let archive_entry_name = src_dir.file_name().and_then(|n| n.to_str()).unwrap_or("artifact");
+    let archive_entry_name = src_dir
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("artifact");
     builder.append_dir_all(archive_entry_name, src_dir)?;
     builder.finish()?;
     Ok(())
@@ -100,20 +106,27 @@ pub fn restore(archive_path: &Path) -> Result<PathBuf> {
         anyhow::bail!("archive does not exist: {}", archive_path.display());
     }
 
-    let dest_dir = archive_path
-        .parent()
-        .ok_or_else(|| anyhow::anyhow!("archive has no parent directory: {}", archive_path.display()))?;
+    let dest_dir = archive_path.parent().ok_or_else(|| {
+        anyhow::anyhow!(
+            "archive has no parent directory: {}",
+            archive_path.display()
+        )
+    })?;
 
-    let file = File::open(archive_path).with_context(|| format!("failed to open {}", archive_path.display()))?;
+    let file = File::open(archive_path)
+        .with_context(|| format!("failed to open {}", archive_path.display()))?;
     let decoder = flate2::read::GzDecoder::new(file);
     let mut archive = tar::Archive::new(decoder);
 
     // Peek the top-level entry name to know (and check) the restored path
     // before extracting, so we can refuse cleanly instead of partially
     // overwriting something.
-    let entries = archive
-        .entries()
-        .with_context(|| format!("failed to read archive entries in {}", archive_path.display()))?;
+    let entries = archive.entries().with_context(|| {
+        format!(
+            "failed to read archive entries in {}",
+            archive_path.display()
+        )
+    })?;
     let mut restored_name: Option<String> = None;
     for entry in entries {
         let entry = entry?;
@@ -123,13 +136,31 @@ pub fn restore(archive_path: &Path) -> Result<PathBuf> {
             break;
         }
     }
-    let restored_name = restored_name
-        .ok_or_else(|| anyhow::anyhow!("archive is empty or has an unexpected layout: {}", archive_path.display()))?;
+    let restored_name = restored_name.ok_or_else(|| {
+        anyhow::anyhow!(
+            "archive is empty or has an unexpected layout: {}",
+            archive_path.display()
+        )
+    })?;
 
     const VALID_ARTIFACT_NAMES: &[&str] = &[
-        "node_modules", "venv", ".venv", "__pycache__", ".pytest_cache",
-        ".mypy_cache", ".ruff_cache", "target", "build", ".next", ".turbo",
-        "dist", "mod", "go-build", "vendor", "bin", "obj",
+        "node_modules",
+        "venv",
+        ".venv",
+        "__pycache__",
+        ".pytest_cache",
+        ".mypy_cache",
+        ".ruff_cache",
+        "target",
+        "build",
+        ".next",
+        ".turbo",
+        "dist",
+        "mod",
+        "go-build",
+        "vendor",
+        "bin",
+        "obj",
     ];
 
     if !VALID_ARTIFACT_NAMES.contains(&restored_name.as_str()) {

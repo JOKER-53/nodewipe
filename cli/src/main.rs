@@ -1,145 +1,22 @@
+mod cli_def;
 mod cmd_doctor;
 mod cmd_stats;
 mod tui;
 mod update;
 
 use anyhow::{Context, Result};
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::Parser;
+pub use cli_def::BANNER;
+use cli_def::{Cli, Command, DeleteModeArg, SortKey};
+use nodewipe_core::history::{format_date, now_unix};
 use nodewipe_core::{
-    annotate_workspace_roots, delete, find_stale_projects, group_by_workspace,
-    history_append, load_config, load_ignore_patterns, restore, scan,
-    ArtifactKind, DeleteMode, Entry, HistoryEntry, ScanOptions,
+    ArtifactKind, DeleteMode, Entry, HistoryEntry, ScanOptions, annotate_workspace_roots, delete,
+    find_stale_projects, group_by_workspace, history_append, load_config, load_ignore_patterns,
+    restore, scan,
 };
-use nodewipe_core::history::{now_unix, format_date};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::{Duration, SystemTime};
-
-const BANNER: &str = r#"
- _   _           _    __        ___            
-| \ | | ___   __| | __\ \      / (_)_ __   ___ 
-|  \| |/ _ \ / _` |/ _ \ \ /\ / /| | '_ \ / _ \
-| |\  | (_) | (_| |  __/\ V  V / | | |_) |  __/
-|_| \_|\___/ \__,_|\___| \_/\_/  |_| .__/ \___|
-                                   |_|         
-"#;
-
-const TYPE_HELP: &str = "node_modules, venv, pycache, pytest_cache, mypy_cache, \
-ruff_cache, rust_target, maven_target, gradle_build, next_cache, turbo_cache, dist";
-
-#[derive(Parser)]
-#[command(
-    name = "nodewipe",
-    version,
-    about = "Find and reclaim disk space from stray dev-dependency and build-artifact directories",
-    before_help = BANNER
-)]
-struct Cli {
-    #[command(subcommand)]
-    command: Option<Command>,
-
-    #[arg(value_name = "PATH")]
-    path: Option<PathBuf>,
-
-    #[arg(long, global = true, default_value = ".")]
-    root: PathBuf,
-
-    #[arg(long, global = true)]
-    json: bool,
-
-    #[arg(long, global = true, value_delimiter = ',')]
-    exclude_types: Vec<String>,
-
-    #[arg(long, global = true)]
-    no_ignore_file: bool,
-}
-
-#[derive(Subcommand)]
-enum Command {
-    /// Scan for disposable artifact directories (default if no subcommand given).
-    Scan {
-        /// Directory to scan, e.g. `nodewipe scan ~`
-        #[arg(value_name = "PATH")]
-        path: Option<PathBuf>,
-
-        /// Only show entries at least this many megabytes in size.
-        #[arg(long, default_value_t = 0)]
-        min_mb: u64,
-
-        /// Group output by monorepo/workspace root instead of a flat list.
-        #[arg(long)]
-        grouped: bool,
-
-        /// Only show artifacts whose last modification is older than this,
-        /// e.g. `30d`, `2w`, `6m`, `1y`.
-        #[arg(long)]
-        older_than: Option<String>,
-
-        /// Primary sort order: `size` (largest first, default) or `age`
-        /// (oldest-last-touched first, surfaces abandoned projects).
-        #[arg(long, value_enum, default_value_t = SortKey::Size)]
-        sort: SortKey,
-
-        /// Flag projects as likely-abandoned when source files haven't been
-        /// touched in this many days. Prints a stale-project summary below
-        /// the normal scan output.
-        #[arg(long)]
-        stale_days: Option<u64>,
-    },
-    /// Delete one or more artifact directories.
-    Delete {
-        paths: Vec<PathBuf>,
-
-        #[arg(long, value_enum)]
-        mode: Option<DeleteModeArg>,
-
-        #[arg(long)]
-        yes: bool,
-
-        #[arg(long)]
-        dry_run: bool,
-    },
-    /// Restore a `.tar.gz` backup created by `delete --mode archive`.
-    Restore {
-        archive: PathBuf,
-    },
-    /// List every supported artifact type and its slug (for --exclude-types).
-    Types,
-    /// Launch the desktop GUI.
-    Gui,
-    /// Scan your system and show a breakdown of disk usage by ecosystem:
-    /// how many Rust target/ dirs, Python venvs, etc., and which is oldest.
-    Doctor {
-        /// Directory to scan, e.g. `nodewipe doctor ~`
-        #[arg(value_name = "PATH")]
-        path: Option<PathBuf>,
-    },
-    /// Show a dashboard of how much space you have freed over time.
-    /// Reads ~/.local/share/nodewipe/history.json.
-    Stats {
-        /// How many past days to include in the bar chart.
-        #[arg(long, default_value_t = 30)]
-        days: u64,
-
-        /// Directory context (unused by stats, accepted for consistency).
-        #[arg(value_name = "PATH")]
-        path: Option<PathBuf>,
-    },
-    /// Generate shell completions for the given shell.
-    ///
-    /// Example: nodewipe completions bash > ~/.local/share/bash-completion/completions/nodewipe
-    Completions {
-        #[arg(value_enum)]
-        shell: clap_complete::Shell,
-    },
-}
-
-#[derive(Clone, Copy, ValueEnum)]
-enum DeleteModeArg {
-    Trash,
-    Archive,
-    Permanent,
-}
 
 impl From<DeleteModeArg> for DeleteMode {
     fn from(v: DeleteModeArg) -> Self {
@@ -149,14 +26,6 @@ impl From<DeleteModeArg> for DeleteMode {
             DeleteModeArg::Permanent => DeleteMode::Permanent,
         }
     }
-}
-
-#[derive(Clone, Copy, ValueEnum)]
-enum SortKey {
-    /// Sort by size, largest first (default).
-    Size,
-    /// Sort by last-modified date, oldest first.
-    Age,
 }
 
 fn main() -> ExitCode {
@@ -181,7 +50,11 @@ fn run(cli: Cli) -> Result<ExitCode> {
     exclude_kinds.sort_by_key(|k| k.slug());
     exclude_kinds.dedup_by_key(|k| k.slug());
 
-    let ignore_patterns = if cli.no_ignore_file { nodewipe_core::Gitignore::empty() } else { load_ignore_patterns(&root) };
+    let ignore_patterns = if cli.no_ignore_file {
+        nodewipe_core::Gitignore::empty()
+    } else {
+        load_ignore_patterns(&root)
+    };
 
     if !cli.json && atty_stdout() {
         let _ = update::check_and_prompt_update();
@@ -190,17 +63,49 @@ fn run(cli: Cli) -> Result<ExitCode> {
     match cli.command {
         None => {
             if cli.json || !atty_stdout() {
-                cmd_scan(&root, cli.json, 0, false, exclude_kinds, ignore_patterns, None, SortKey::Size, None)
+                cmd_scan(
+                    &root,
+                    cli.json,
+                    0,
+                    false,
+                    exclude_kinds,
+                    ignore_patterns,
+                    None,
+                    SortKey::Size,
+                    None,
+                )
             } else {
                 tui::run(root)?;
                 Ok(ExitCode::SUCCESS)
             }
         }
-        Some(Command::Scan { path: sub_path, min_mb, grouped, older_than, sort, stale_days }) => {
+        Some(Command::Scan {
+            path: sub_path,
+            min_mb,
+            grouped,
+            older_than,
+            sort,
+            stale_days,
+        }) => {
             let scan_root = sub_path.unwrap_or(root);
-            cmd_scan(&scan_root, cli.json, min_mb, grouped, exclude_kinds, ignore_patterns, older_than, sort, stale_days)
+            cmd_scan(
+                &scan_root,
+                cli.json,
+                min_mb,
+                grouped,
+                exclude_kinds,
+                ignore_patterns,
+                older_than,
+                sort,
+                stale_days,
+            )
         }
-        Some(Command::Delete { paths, mode, yes, dry_run }) => {
+        Some(Command::Delete {
+            paths,
+            mode,
+            yes,
+            dry_run,
+        }) => {
             let resolved_mode = resolve_delete_mode(mode, &config);
             cmd_delete(paths, resolved_mode, yes, dry_run, cli.json)
         }
@@ -211,9 +116,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
             let doctor_root = sub_path.unwrap_or(root);
             cmd_doctor::run(doctor_root, cli.json, exclude_kinds, ignore_patterns)
         }
-        Some(Command::Stats { days, path: _ }) => {
-            cmd_stats::run(cli.json, days)
-        }
+        Some(Command::Stats { days, path: _ }) => cmd_stats::run(cli.json, days),
         Some(Command::Completions { shell }) => {
             use clap::CommandFactory;
             let mut cmd = Cli::command();
@@ -223,7 +126,10 @@ fn run(cli: Cli) -> Result<ExitCode> {
     }
 }
 
-fn resolve_delete_mode(cli_mode: Option<DeleteModeArg>, config: &nodewipe_core::Config) -> DeleteMode {
+fn resolve_delete_mode(
+    cli_mode: Option<DeleteModeArg>,
+    config: &nodewipe_core::Config,
+) -> DeleteMode {
     if let Some(m) = cli_mode {
         return m.into();
     }
@@ -238,11 +144,20 @@ fn resolve_delete_mode(cli_mode: Option<DeleteModeArg>, config: &nodewipe_core::
     }
 }
 
+fn type_help() -> String {
+    ArtifactKind::ALL
+        .iter()
+        .map(|k| k.slug())
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 fn parse_exclude_types(raw: &[String]) -> Result<Vec<ArtifactKind>> {
     raw.iter()
         .map(|s| {
-            ArtifactKind::from_slug(s.trim())
-                .ok_or_else(|| anyhow::anyhow!("unknown artifact type '{s}'. Valid types: {TYPE_HELP}"))
+            ArtifactKind::from_slug(s.trim()).ok_or_else(|| {
+                anyhow::anyhow!("unknown artifact type '{s}'. Valid types: {}", type_help())
+            })
         })
         .collect()
 }
@@ -282,8 +197,9 @@ fn cmd_types() -> Result<ExitCode> {
     Ok(ExitCode::SUCCESS)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn cmd_scan(
-    root: &PathBuf,
+    root: &Path,
     json: bool,
     min_mb: u64,
     grouped: bool,
@@ -294,7 +210,7 @@ fn cmd_scan(
     stale_days: Option<u64>,
 ) -> Result<ExitCode> {
     let opts = ScanOptions {
-        root: root.clone(),
+        root: root.to_path_buf(),
         exclude_kinds,
         ignore_patterns,
         ..Default::default()
@@ -310,14 +226,17 @@ fn cmd_scan(
         let threshold = parse_duration(&older_than)?;
         let now = SystemTime::now();
         entries.retain(|e| match e.last_modified {
-            Some(t) => now.duration_since(t).map(|age| age >= threshold).unwrap_or(false),
+            Some(t) => now
+                .duration_since(t)
+                .map(|age| age >= threshold)
+                .unwrap_or(false),
             None => false,
         });
     }
 
     match sort {
         SortKey::Size => {
-            entries.sort_by(|a, b| b.size_bytes.cmp(&a.size_bytes));
+            entries.sort_by_key(|b| std::cmp::Reverse(b.size_bytes));
         }
         SortKey::Age => {
             entries.sort_by(|a, b| match (a.last_modified, b.last_modified) {
@@ -339,12 +258,24 @@ fn cmd_scan(
     if grouped {
         let groups = group_by_workspace(entries);
         if json {
-            println!("{}", serde_json::to_string_pretty(&groups.into_values().collect::<Vec<_>>())?);
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&groups.into_values().collect::<Vec<_>>())?
+            );
         } else {
             for group in groups.values() {
-                println!("\n{} ({})", group.root.display(), human_size(group.total_size_bytes));
+                println!(
+                    "\n{} ({})",
+                    group.root.display(),
+                    human_size(group.total_size_bytes)
+                );
                 for e in &group.entries {
-                    println!("  {}  {}  {}", human_size(e.size_bytes), kind_display(e), e.path.display());
+                    println!(
+                        "  {}  {}  {}",
+                        human_size(e.size_bytes),
+                        kind_display(e),
+                        e.path.display()
+                    );
                 }
             }
         }
@@ -360,16 +291,27 @@ fn cmd_scan(
         for e in &entries {
             let age_str = match e.last_modified {
                 Some(mtime) => {
-                    let days = now.duration_since(mtime)
+                    let days = now
+                        .duration_since(mtime)
                         .map(|d| d.as_secs() / 86400)
                         .unwrap_or(0);
                     format!("{:>4}d", days)
                 }
                 None => "   ?d".to_string(),
             };
-            println!("{}  {}  {}  {}", human_size(e.size_bytes), age_str, kind_display(e), e.path.display());
+            println!(
+                "{}  {}  {}  {}",
+                human_size(e.size_bytes),
+                age_str,
+                kind_display(e),
+                e.path.display()
+            );
         }
-        println!("\n{} artifacts found, {} reclaimable", entries.len(), human_size(total));
+        println!(
+            "\n{} artifacts found, {} reclaimable",
+            entries.len(),
+            human_size(total)
+        );
 
         if !stale.is_empty() {
             println!(
@@ -379,7 +321,8 @@ fn cmd_scan(
                 stale_days.unwrap_or(90),
             );
             for s in &stale {
-                println!("   {} days   {}   {}",
+                println!(
+                    "   {} days   {}   {}",
                     s.stale_days,
                     human_size(s.reclaimable_bytes),
                     s.root.display(),
@@ -459,10 +402,14 @@ fn cmd_delete(
         }
     }
 
-    Ok(if had_error { ExitCode::FAILURE } else { ExitCode::SUCCESS })
+    Ok(if had_error {
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
+    })
 }
 
-fn cmd_restore(archive: &PathBuf, json: bool) -> Result<ExitCode> {
+fn cmd_restore(archive: &Path, json: bool) -> Result<ExitCode> {
     match restore(archive) {
         Ok(restored_path) => {
             if json {
@@ -481,19 +428,25 @@ fn cmd_restore(archive: &PathBuf, json: bool) -> Result<ExitCode> {
 
 fn print_risk_warnings(paths: &[PathBuf]) {
     for p in paths {
-        if let Some(kind) = nodewipe_core::classify_path(p) {
-            if let Some(note) = kind.risk_note() {
-                eprintln!("⚠ WARNING [{}] {}\n  {}\n", kind.label(), p.display(), note);
-            }
+        if let Some(kind) = nodewipe_core::classify_path(p)
+            && let Some(note) = kind.risk_note()
+        {
+            eprintln!("⚠ WARNING [{}] {}\n  {}\n", kind.label(), p.display(), note);
         }
     }
 }
 
 fn cmd_gui() -> Result<ExitCode> {
-    let exe_dir = std::env::current_exe().ok().and_then(|p| p.parent().map(|d| d.to_path_buf()));
+    let exe_dir = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| d.to_path_buf()));
 
     if let Some(dir) = &exe_dir {
-        let gui_bin_name = if cfg!(windows) { "nodewipe-gui.exe" } else { "nodewipe-gui" };
+        let gui_bin_name = if cfg!(windows) {
+            "nodewipe-gui.exe"
+        } else {
+            "nodewipe-gui"
+        };
         let candidates = [dir.join(gui_bin_name), dir.join("nodewipe-gui.AppImage")];
 
         for candidate in candidates {
@@ -508,7 +461,10 @@ fn cmd_gui() -> Result<ExitCode> {
     }
 
     if cfg!(target_os = "macos") {
-        let launched = std::process::Command::new("open").arg("-a").arg("nodewipe").status();
+        let launched = std::process::Command::new("open")
+            .arg("-a")
+            .arg("nodewipe")
+            .status();
         if matches!(launched, Ok(status) if status.success()) {
             return Ok(ExitCode::SUCCESS);
         }
@@ -517,7 +473,9 @@ fn cmd_gui() -> Result<ExitCode> {
     eprintln!("nodewipe GUI isn't installed alongside this CLI.");
     eprintln!();
     eprintln!("Install both with:");
-    eprintln!("  curl -fsSL https://raw.githubusercontent.com/KADHIRAVANEG/nodewipe/main/scripts/install.sh | bash");
+    eprintln!(
+        "  curl -fsSL https://raw.githubusercontent.com/KADHIRAVANEG/nodewipe/main/install.sh | bash"
+    );
     eprintln!("  (choose option 2: CLI + GUI)");
     eprintln!();
     eprintln!("Or from source:");
@@ -525,7 +483,7 @@ fn cmd_gui() -> Result<ExitCode> {
     Ok(ExitCode::FAILURE)
 }
 
-fn dir_size_quick(path: &PathBuf) -> u64 {
+fn dir_size_quick(path: &Path) -> u64 {
     nodewipe_core::scanner::dir_size(path)
 }
 

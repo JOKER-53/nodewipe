@@ -2,7 +2,13 @@ use crate::model::{Entry, WorkspaceGroup};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-const WORKSPACE_MARKERS: &[&str] = &["pnpm-workspace.yaml", "lerna.json"];
+const WORKSPACE_MARKERS: &[&str] = &[
+    "pnpm-workspace.yaml",
+    "lerna.json",
+    "turbo.json",
+    "nx.json",
+    "go.work",
+];
 
 /// For each entry, walk up its ancestors (starting from the artifact's
 /// parent) looking for a monorepo marker file, or a `package.json` containing
@@ -24,10 +30,12 @@ fn find_workspace_root(artifact_path: &Path, scan_root: &Path) -> Option<PathBuf
         if WORKSPACE_MARKERS.iter().any(|m| dir.join(m).exists()) {
             return Some(dir.to_path_buf());
         }
-        if let Some(pkg) = read_package_json(dir) {
-            if pkg.contains("\"workspaces\"") {
-                return Some(dir.to_path_buf());
-            }
+        if read_package_json(dir).is_some_and(|pkg| pkg.contains("\"workspaces\"")) {
+            return Some(dir.to_path_buf());
+        }
+        if std::fs::read_to_string(dir.join("Cargo.toml")).is_ok_and(|c| c.contains("[workspace]"))
+        {
+            return Some(dir.to_path_buf());
         }
         if dir == scan_root {
             break;

@@ -22,17 +22,16 @@
 ///  Run `nodewipe scan --older-than 90d` to list candidates for deletion.
 /// ```
 use anyhow::Result;
-use nodewipe_core::{
-    doctor::build_report,
-    scan,
-    ArtifactKind,
-    ScanOptions,
-    Gitignore,
-};
+use nodewipe_core::{ArtifactKind, Gitignore, ScanOptions, doctor::build_report, scan};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-pub fn run(root: PathBuf, json: bool, exclude_kinds: Vec<ArtifactKind>, ignore_patterns: Gitignore) -> Result<ExitCode> {
+pub fn run(
+    root: PathBuf,
+    json: bool,
+    exclude_kinds: Vec<ArtifactKind>,
+    ignore_patterns: Gitignore,
+) -> Result<ExitCode> {
     if !json {
         eprintln!("\n 🩺  nodewipe doctor — scanning {} …\n", root.display());
         eprintln!(" This may take a moment on large trees.\n");
@@ -69,8 +68,8 @@ pub fn run(root: PathBuf, json: bool, exclude_kinds: Vec<ArtifactKind>, ignore_p
 
     // Table header
     println!(
-        " {:<22} {:>6}   {:>10}   {:<10}  {}",
-        "Ecosystem", "Count", "Total", "Oldest", "Oldest path"
+        " {:<22} {:>6}   {:>10}   {:<10}  Oldest path",
+        "Ecosystem", "Count", "Total", "Oldest"
     );
     println!(" {}", "─".repeat(80));
 
@@ -79,11 +78,7 @@ pub fn run(root: PathBuf, json: bool, exclude_kinds: Vec<ArtifactKind>, ignore_p
             Some(d) => format!("{d} days"),
             None => "unknown".to_string(),
         };
-        let oldest_path = eco
-            .oldest_path
-            .as_deref()
-            .unwrap_or("—")
-            .to_string();
+        let oldest_path = eco.oldest_path.as_deref().unwrap_or("—").to_string();
         // Truncate very long paths for display.
         let oldest_path = truncate_path(&oldest_path, 45);
 
@@ -105,7 +100,7 @@ pub fn run(root: PathBuf, json: bool, exclude_kinds: Vec<ArtifactKind>, ignore_p
         .iter()
         .flat_map(|e| e.biggest.iter())
         .collect();
-    all_biggest.sort_by(|a, b| b.size_bytes.cmp(&a.size_bytes));
+    all_biggest.sort_by_key(|b| std::cmp::Reverse(b.size_bytes));
     all_biggest.truncate(5);
 
     if !all_biggest.is_empty() {

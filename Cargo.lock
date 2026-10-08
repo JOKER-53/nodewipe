@@ -2471,6 +2471,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tar",
+ "tempfile",
  "toml 0.8.2",
  "trash",
  "walkdir",

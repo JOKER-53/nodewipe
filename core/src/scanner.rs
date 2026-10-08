@@ -30,13 +30,41 @@ struct Rule {
 /// needed. Order matters when multiple rules share a directory name (e.g.
 /// `target` for Rust vs. Maven): the first rule whose marker is satisfied wins.
 const RULES: &[Rule] = &[
-    Rule { name: "node_modules", kind: ArtifactKind::NodeModules, marker: Marker::None },
-    Rule { name: "venv", kind: ArtifactKind::PythonVenv, marker: Marker::SelfHasAny(&["pyvenv.cfg"]) },
-    Rule { name: ".venv", kind: ArtifactKind::PythonVenv, marker: Marker::SelfHasAny(&["pyvenv.cfg"]) },
-    Rule { name: "__pycache__", kind: ArtifactKind::PythonPycache, marker: Marker::None },
-    Rule { name: ".pytest_cache", kind: ArtifactKind::PythonPytestCache, marker: Marker::None },
-    Rule { name: ".mypy_cache", kind: ArtifactKind::PythonMypyCache, marker: Marker::None },
-    Rule { name: ".ruff_cache", kind: ArtifactKind::PythonRuffCache, marker: Marker::None },
+    Rule {
+        name: "node_modules",
+        kind: ArtifactKind::NodeModules,
+        marker: Marker::None,
+    },
+    Rule {
+        name: "venv",
+        kind: ArtifactKind::PythonVenv,
+        marker: Marker::SelfHasAny(&["pyvenv.cfg"]),
+    },
+    Rule {
+        name: ".venv",
+        kind: ArtifactKind::PythonVenv,
+        marker: Marker::SelfHasAny(&["pyvenv.cfg"]),
+    },
+    Rule {
+        name: "__pycache__",
+        kind: ArtifactKind::PythonPycache,
+        marker: Marker::None,
+    },
+    Rule {
+        name: ".pytest_cache",
+        kind: ArtifactKind::PythonPytestCache,
+        marker: Marker::None,
+    },
+    Rule {
+        name: ".mypy_cache",
+        kind: ArtifactKind::PythonMypyCache,
+        marker: Marker::None,
+    },
+    Rule {
+        name: ".ruff_cache",
+        kind: ArtifactKind::PythonRuffCache,
+        marker: Marker::None,
+    },
     Rule {
         name: "target",
         kind: ArtifactKind::RustTarget,
@@ -52,12 +80,20 @@ const RULES: &[Rule] = &[
         kind: ArtifactKind::JavaGradleBuild,
         marker: Marker::ParentHasAny(&["build.gradle", "build.gradle.kts"]),
     },
-    Rule { name: ".next", kind: ArtifactKind::NextCache, marker: Marker::None },
-    Rule { name: ".turbo", kind: ArtifactKind::TurboCache, marker: Marker::None },
+    Rule {
+        name: ".next",
+        kind: ArtifactKind::NextCache,
+        marker: Marker::None,
+    },
+    Rule {
+        name: ".turbo",
+        kind: ArtifactKind::TurboCache,
+        marker: Marker::None,
+    },
     Rule {
         name: "dist",
         kind: ArtifactKind::GenericDist,
-        marker: Marker::ParentHasAny(&["package.json"]),
+        marker: Marker::ParentHasAny(&["package.json", "pyproject.toml", "setup.py"]),
     },
     // Go: `pkg/mod` inside a `go/` directory, or confirmed by sibling `go.mod`.
     // `go/pkg/mod` is the standard GOPATH module cache layout.
@@ -67,7 +103,11 @@ const RULES: &[Rule] = &[
         marker: Marker::ParentHasAny(&["go.sum", "go.mod"]),
     },
     // Go build cache lives at `.cache/go-build` — matched by name, no ambiguity.
-    Rule { name: "go-build", kind: ArtifactKind::GoBuildCache, marker: Marker::None },
+    Rule {
+        name: "go-build",
+        kind: ArtifactKind::GoBuildCache,
+        marker: Marker::None,
+    },
     // PHP/Composer: `vendor/` confirmed by sibling `composer.json`.
     Rule {
         name: "vendor",
@@ -157,7 +197,9 @@ pub fn scan(opts: &ScanOptions) -> Result<Vec<Entry>> {
     let exclude = opts.exclude_dirs.clone();
     let mut matches: Vec<(ArtifactKind, PathBuf)> = Vec::new();
 
-    let mut it = WalkDir::new(&opts.root).follow_links(opts.follow_symlinks).into_iter();
+    let mut it = WalkDir::new(&opts.root)
+        .follow_links(opts.follow_symlinks)
+        .into_iter();
 
     while let Some(res) = it.next() {
         let entry = match res {
@@ -224,14 +266,12 @@ fn build_entry(path: &Path, kind: ArtifactKind, compute_sizes: bool) -> Entry {
     }
 }
 
-/// Sums file sizes under `path` in parallel. Symlinks are not followed, to
-/// avoid double-counting.
+/// Sums file sizes under `path`. Symlinks are not followed to avoid double-counting.
 pub fn dir_size(path: &Path) -> u64 {
     WalkDir::new(path)
         .follow_links(false)
         .into_iter()
         .filter_map(|e| e.ok())
-        .par_bridge()
         .filter(|e| e.file_type().is_file())
         .map(|e| e.metadata().map(|m| m.len()).unwrap_or(0))
         .sum()

@@ -78,8 +78,7 @@ pub fn append(entry: HistoryEntry) -> Result<()> {
     let mut entries = if path.exists() { load()? } else { Vec::new() };
     entries.push(entry);
 
-    let serialized = serde_json::to_string_pretty(&entries)
-        .context("serializing history")?;
+    let serialized = serde_json::to_string_pretty(&entries).context("serializing history")?;
     std::fs::write(&path, serialized)
         .with_context(|| format!("writing history file {}", path.display()))?;
     Ok(())
@@ -105,7 +104,7 @@ pub fn stats_by_ecosystem(entries: &[HistoryEntry]) -> Vec<EcosystemStats> {
     }
     let mut stats: Vec<EcosystemStats> = map.into_values().collect();
     // Largest freed first.
-    stats.sort_by(|a, b| b.total_bytes.cmp(&a.total_bytes));
+    stats.sort_by_key(|b| std::cmp::Reverse(b.total_bytes));
     stats
 }
 
@@ -159,9 +158,9 @@ pub fn format_date(unix_secs: u64) -> String {
     let e = c - (1461 * d) / 4;
     let m = (5 * e + 2) / 153;
 
-    let day   = e - (153 * m + 2) / 5 + 1;
+    let day = e - (153 * m + 2) / 5 + 1;
     let month = m + 3 - 12 * (m / 10);
-    let year  = 100 * b + d - 4800 + m / 10;
+    let year = 100 * b + d - 4800 + m / 10;
 
     format!("{:04}-{:02}-{:02}", year, month, day)
 }

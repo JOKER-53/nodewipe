@@ -1,14 +1,20 @@
 use anyhow::Result;
-use crossterm::event::{self, Event, KeyCode, KeyEventKind};
-use crossterm::terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen};
 use crossterm::ExecutableCommand;
-use nodewipe_core::{annotate_workspace_roots, delete, load_config, load_ignore_patterns, restore, scan, ArtifactKind, DeleteMode, Entry, ScanOptions};
+use crossterm::event::{self, Event, KeyCode, KeyEventKind};
+use crossterm::terminal::{
+    EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
+};
+use nodewipe_core::history::{format_date, now_unix};
+use nodewipe_core::{
+    ArtifactKind, DeleteMode, Entry, HistoryEntry, ScanOptions, annotate_workspace_roots, delete,
+    history_append, load_config, load_ignore_patterns, restore, scan,
+};
+use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap};
-use ratatui::Terminal;
 use std::collections::HashSet;
 use std::io::stdout;
 use std::path::PathBuf;
@@ -111,7 +117,7 @@ impl App {
             match scan(&opts) {
                 Ok(mut entries) => {
                     annotate_workspace_roots(&mut entries, &opts.root);
-                    entries.sort_by(|a, b| b.size_bytes.cmp(&a.size_bytes));
+                    entries.sort_by_key(|b| std::cmp::Reverse(b.size_bytes));
                     let _ = tx.send(ScanMsg::Done(entries));
                 }
                 Err(e) => {
@@ -123,29 +129,28 @@ impl App {
 
     /// Called each event loop tick while in the Scanning stage.
     fn poll_scan(&mut self) {
-        if let Some(rx) = &self.scan_rx {
-            if let Ok(msg) = rx.try_recv() {
-                match msg {
-                    ScanMsg::Done(entries) => {
-                        let elapsed = self.scan_started.map(|s| s.elapsed().as_secs()).unwrap_or(0);
-                        self.entries = entries;
-                        self.cursor = 0;
-                        self.selected.clear();
-                        self.status = format!(
-                            "{} artifacts found in {}s",
-                            self.entries.len(),
-                            elapsed
-                        );
-                        self.stage = Stage::Results;
-                    }
-                    ScanMsg::Error(e) => {
-                        self.status = format!("Scan error: {e}");
-                        self.stage = Stage::Results;
-                    }
+        if let Some(rx) = &self.scan_rx
+            && let Ok(msg) = rx.try_recv()
+        {
+            match msg {
+                ScanMsg::Done(entries) => {
+                    let elapsed = self
+                        .scan_started
+                        .map(|s| s.elapsed().as_secs())
+                        .unwrap_or(0);
+                    self.entries = entries;
+                    self.cursor = 0;
+                    self.selected.clear();
+                    self.status = format!("{} artifacts found in {}s", self.entries.len(), elapsed);
+                    self.stage = Stage::Results;
                 }
-                self.scan_rx = None;
-                self.scan_started = None;
+                ScanMsg::Error(e) => {
+                    self.status = format!("Scan error: {e}");
+                    self.stage = Stage::Results;
+                }
             }
+            self.scan_rx = None;
+            self.scan_started = None;
         }
         self.spinner_tick = self.spinner_tick.wrapping_add(1);
     }
@@ -173,19 +178,25 @@ impl App {
     }
 
     fn move_cursor(&mut self, delta: i32) {
-        if self.entries.is_empty() { return; }
+        if self.entries.is_empty() {
+            return;
+        }
         let len = self.entries.len() as i32;
         self.cursor = (self.cursor as i32 + delta).clamp(0, len - 1) as usize;
     }
 
     fn move_restore_cursor(&mut self, delta: i32) {
-        if self.archives.is_empty() { return; }
+        if self.archives.is_empty() {
+            return;
+        }
         let len = self.archives.len() as i32;
         self.restore_cursor = (self.restore_cursor as i32 + delta).clamp(0, len - 1) as usize;
     }
 
     fn toggle_selected(&mut self) {
-        if self.entries.is_empty() { return; }
+        if self.entries.is_empty() {
+            return;
+        }
         if self.selected.contains(&self.cursor) {
             self.selected.remove(&self.cursor);
         } else {
@@ -207,12 +218,18 @@ impl App {
         indices
             .iter()
             .filter_map(|i| self.entries.get(*i))
-            .filter_map(|e| e.kind.risk_note().map(|note| format!("{}: {note}", e.path.display())))
+            .filter_map(|e| {
+                e.kind
+                    .risk_note()
+                    .map(|note| format!("{}: {note}", e.path.display()))
+            })
             .collect()
     }
 
     fn request_delete(&mut self, indices: Vec<usize>, mode: DeleteMode) {
-        if indices.is_empty() { return; }
+        if indices.is_empty() {
+            return;
+        }
         let warnings = self.risk_warnings(&indices);
         let has_warnings = !warnings.is_empty();
 
@@ -226,13 +243,27 @@ impl App {
                 }
                 lines.push(String::new());
             }
-            lines.push(format!("Proceed with {:?}? (y = yes · any other key = cancel)", mode));
-            (format!("⚠  Warning — {} delete", format!("{:?}", mode).to_lowercase()), lines, true)
+            lines.push(format!(
+                "Proceed with {:?}? (y = yes · any other key = cancel)",
+                mode
+            ));
+            (
+                format!(
+                    "⚠  Warning — {} delete",
+                    format!("{:?}", mode).to_lowercase()
+                ),
+                lines,
+                true,
+            )
         } else if mode == DeleteMode::Permanent {
             (
                 "Confirm permanent delete".to_string(),
                 vec![
-                    format!("Permanently delete {} item{}?", indices.len(), if indices.len() == 1 { "" } else { "s" }),
+                    format!(
+                        "Permanently delete {} item{}?",
+                        indices.len(),
+                        if indices.len() == 1 { "" } else { "s" }
+                    ),
                     String::new(),
                     "This cannot be undone.".to_string(),
                     String::new(),
@@ -249,9 +280,16 @@ impl App {
             (
                 format!("Confirm {action}"),
                 vec![
-                    format!("{} {} item{}?",
-                        if mode == DeleteMode::Trash { "Move to trash:" } else { "Archive and delete:" },
-                        indices.len(), if indices.len() == 1 { "" } else { "s" }),
+                    format!(
+                        "{} {} item{}?",
+                        if mode == DeleteMode::Trash {
+                            "Move to trash:"
+                        } else {
+                            "Archive and delete:"
+                        },
+                        indices.len(),
+                        if indices.len() == 1 { "" } else { "s" }
+                    ),
                     String::new(),
                     "y = confirm  ·  any other key = cancel".to_string(),
                 ],
@@ -272,7 +310,20 @@ impl App {
         for &idx in &sorted {
             if let Some(entry) = self.entries.get(idx).cloned() {
                 match delete(&entry.path, mode, entry.size_bytes) {
-                    Ok(res) => { freed += res.freed_bytes; self.entries.remove(idx); }
+                    Ok(res) => {
+                        let ts = now_unix();
+                        let kind_slug = entry.kind.slug().to_string();
+                        let _ = history_append(HistoryEntry {
+                            deleted_at: ts,
+                            date: format_date(ts),
+                            path: entry.path.display().to_string(),
+                            kind: kind_slug,
+                            size_bytes: entry.size_bytes,
+                            mode: format!("{mode:?}").to_lowercase(),
+                        });
+                        freed += res.freed_bytes;
+                        self.entries.remove(idx);
+                    }
                     Err(_) => errors += 1,
                 }
             }
@@ -284,16 +335,33 @@ impl App {
         self.status = if errors == 0 {
             format!("Freed {} ({:?})", human_size(freed), mode)
         } else {
-            format!("Freed {} ({:?}), {} failed", human_size(freed), mode, errors)
+            format!(
+                "Freed {} ({:?}), {} failed",
+                human_size(freed),
+                mode,
+                errors
+            )
         };
     }
 
     fn total_selected_size(&self) -> u64 {
-        self.selected_indices().iter().filter_map(|i| self.entries.get(*i)).map(|e| e.size_bytes).sum()
+        self.selected_indices()
+            .iter()
+            .filter_map(|i| self.entries.get(*i))
+            .map(|e| e.size_bytes)
+            .sum()
     }
 }
 
 pub fn run(root: PathBuf) -> Result<()> {
+    let prev_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let _ = disable_raw_mode();
+        let _ = stdout().execute(LeaveAlternateScreen);
+        let _ = stdout().execute(crossterm::cursor::Show);
+        prev_hook(info);
+    }));
+
     enable_raw_mode()?;
     let mut out = stdout();
     out.execute(EnterAlternateScreen)?;
@@ -303,25 +371,28 @@ pub fn run(root: PathBuf) -> Result<()> {
     let mut app = App::new(root);
     let result = event_loop(&mut terminal, &mut app);
 
-    disable_raw_mode()?;
-    terminal.backend_mut().execute(LeaveAlternateScreen)?;
-    terminal.show_cursor()?;
+    let _ = disable_raw_mode();
+    let _ = terminal.backend_mut().execute(LeaveAlternateScreen);
+    let _ = terminal.show_cursor();
     result
 }
 
-fn event_loop(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, app: &mut App) -> Result<()> {
+fn event_loop(
+    terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
+    app: &mut App,
+) -> Result<()> {
     loop {
         // While scanning, poll for results and redraw with a short timeout
         // so the spinner actually animates.
         if app.stage == Stage::Scanning {
             app.poll_scan();
             terminal.draw(|f| draw(f, app))?;
-            if event::poll(Duration::from_millis(80))? {
-                if let Event::Key(key) = event::read()? {
-                    if key.kind == KeyEventKind::Press && key.code == KeyCode::Char('q') {
-                        break;
-                    }
-                }
+            if event::poll(Duration::from_millis(80))?
+                && let Event::Key(key) = event::read()?
+                && key.kind == KeyEventKind::Press
+                && key.code == KeyCode::Char('q')
+            {
+                break;
             }
             continue;
         }
@@ -329,30 +400,35 @@ fn event_loop(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, app: &
         terminal.draw(|f| draw(f, app))?;
 
         if let Event::Key(key) = event::read()? {
-            if key.kind != KeyEventKind::Press { continue; }
+            if key.kind != KeyEventKind::Press {
+                continue;
+            }
 
             match app.stage {
                 Stage::Splash => {
-                    if key.code == KeyCode::Char('q') || key.code == KeyCode::Esc { break; }
+                    if key.code == KeyCode::Char('q') || key.code == KeyCode::Esc {
+                        break;
+                    }
                     app.stage = Stage::SelectTypes;
                 }
-                Stage::SelectTypes => {
-                    match key.code {
-                        KeyCode::Char('q') => break,
-                        KeyCode::Down | KeyCode::Char('j') => app.move_filter_cursor(1),
-                        KeyCode::Up | KeyCode::Char('k') => app.move_filter_cursor(-1),
-                        KeyCode::Char(' ') => app.toggle_filter_kind(),
-                        KeyCode::Char('a') => app.excluded_kinds.clear(),
-                        KeyCode::Char('n') => {
-                            app.excluded_kinds = ArtifactKind::ALL.iter().copied().collect();
-                        }
-                        KeyCode::Enter => app.start_scan(),
-                        _ => {}
+                Stage::SelectTypes => match key.code {
+                    KeyCode::Char('q') => break,
+                    KeyCode::Down | KeyCode::Char('j') => app.move_filter_cursor(1),
+                    KeyCode::Up | KeyCode::Char('k') => app.move_filter_cursor(-1),
+                    KeyCode::Char(' ') => app.toggle_filter_kind(),
+                    KeyCode::Char('a') => app.excluded_kinds.clear(),
+                    KeyCode::Char('n') => {
+                        app.excluded_kinds = ArtifactKind::ALL.iter().copied().collect();
                     }
-                }
+                    KeyCode::Enter => app.start_scan(),
+                    _ => {}
+                },
                 Stage::Scanning => {} // handled above
                 Stage::Results => {
-                    if key.code == KeyCode::Char('t') { app.stage = Stage::SelectTypes; continue; }
+                    if key.code == KeyCode::Char('t') {
+                        app.stage = Stage::SelectTypes;
+                        continue;
+                    }
                     if key.code == KeyCode::Char('R') {
                         // Capital R = go to restore screen
                         app.find_archives();
@@ -382,22 +458,34 @@ fn event_loop(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, app: &
                         KeyCode::Up | KeyCode::Char('k') => app.move_cursor(-1),
                         KeyCode::Char(' ') => app.toggle_selected(),
                         KeyCode::Char('r') => app.start_scan(),
-                        KeyCode::Char('d') => { let idx = app.selected_indices(); app.request_delete(idx, DeleteMode::Trash); }
-                        KeyCode::Char('a') => { let idx = app.selected_indices(); app.request_delete(idx, DeleteMode::Archive); }
-                        KeyCode::Char('p') => { let idx = app.selected_indices(); app.request_delete(idx, DeleteMode::Permanent); }
+                        KeyCode::Char('d') => {
+                            let idx = app.selected_indices();
+                            app.request_delete(idx, DeleteMode::Trash);
+                        }
+                        KeyCode::Char('a') => {
+                            let idx = app.selected_indices();
+                            app.request_delete(idx, DeleteMode::Archive);
+                        }
+                        KeyCode::Char('p') => {
+                            let idx = app.selected_indices();
+                            app.request_delete(idx, DeleteMode::Permanent);
+                        }
                         _ => {}
                     }
                 }
                 Stage::Restore => {
                     match key.code {
-                        KeyCode::Char('q') | KeyCode::Esc => { app.stage = Stage::Results; }
+                        KeyCode::Char('q') | KeyCode::Esc => {
+                            app.stage = Stage::Results;
+                        }
                         KeyCode::Down | KeyCode::Char('j') => app.move_restore_cursor(1),
                         KeyCode::Up | KeyCode::Char('k') => app.move_restore_cursor(-1),
                         KeyCode::Enter => {
                             if let Some(archive) = app.archives.get(app.restore_cursor).cloned() {
                                 match restore(&archive) {
                                     Ok(path) => {
-                                        app.restore_status = format!("Restored to {}", path.display());
+                                        app.restore_status =
+                                            format!("Restored to {}", path.display());
                                         app.find_archives(); // refresh list
                                     }
                                     Err(e) => {
@@ -424,8 +512,11 @@ impl App {
 
     fn toggle_filter_kind(&mut self) {
         let kind = ArtifactKind::ALL[self.filter_cursor];
-        if self.excluded_kinds.contains(&kind) { self.excluded_kinds.remove(&kind); }
-        else { self.excluded_kinds.insert(kind); }
+        if self.excluded_kinds.contains(&kind) {
+            self.excluded_kinds.remove(&kind);
+        } else {
+            self.excluded_kinds.insert(kind);
+        }
     }
 }
 
@@ -444,11 +535,18 @@ fn draw_splash(f: &mut ratatui::Frame) {
     let area = f.area();
     let banner_lines: Vec<Line> = crate::BANNER
         .lines()
-        .map(|l| Line::from(Span::styled(l.to_string(), Style::default().fg(Color::Cyan))))
+        .map(|l| {
+            Line::from(Span::styled(
+                l.to_string(),
+                Style::default().fg(Color::Cyan),
+            ))
+        })
         .collect();
     let mut lines = banner_lines;
     lines.push(Line::from(""));
-    lines.push(Line::from("Find and reclaim disk space from stray dev artifacts."));
+    lines.push(Line::from(
+        "Find and reclaim disk space from stray dev artifacts.",
+    ));
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
         "Press any key to continue  ·  q to quit",
@@ -456,14 +554,23 @@ fn draw_splash(f: &mut ratatui::Frame) {
     )));
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Percentage(30), Constraint::Min(10), Constraint::Percentage(20)])
+        .constraints([
+            Constraint::Percentage(30),
+            Constraint::Min(10),
+            Constraint::Percentage(20),
+        ])
         .split(area);
-    f.render_widget(Paragraph::new(lines).alignment(Alignment::Center).block(Block::default()), chunks[1]);
+    f.render_widget(
+        Paragraph::new(lines)
+            .alignment(Alignment::Center)
+            .block(Block::default()),
+        chunks[1],
+    );
 }
 
 fn draw_scanning(f: &mut ratatui::Frame, app: &App) {
     let area = f.area();
-    const FRAMES: &[&str] = &["⠋","⠙","⠹","⠸","⠼","⠴","⠦","⠧","⠇","⠏"];
+    const FRAMES: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
     let frame = FRAMES[app.spinner_tick / 2 % FRAMES.len()];
     let elapsed = app.scan_started.map(|s| s.elapsed().as_secs()).unwrap_or(0);
 
@@ -473,13 +580,25 @@ fn draw_scanning(f: &mut ratatui::Frame, app: &App) {
             Style::default().fg(Color::Cyan),
         )),
         Line::from(""),
-        Line::from(Span::styled("q to cancel", Style::default().fg(Color::DarkGray))),
+        Line::from(Span::styled(
+            "q to cancel",
+            Style::default().fg(Color::DarkGray),
+        )),
     ];
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Percentage(40), Constraint::Min(5), Constraint::Percentage(40)])
+        .constraints([
+            Constraint::Percentage(40),
+            Constraint::Min(5),
+            Constraint::Percentage(40),
+        ])
         .split(area);
-    f.render_widget(Paragraph::new(lines).alignment(Alignment::Center).block(Block::default()), chunks[1]);
+    f.render_widget(
+        Paragraph::new(lines)
+            .alignment(Alignment::Center)
+            .block(Block::default()),
+        chunks[1],
+    );
 }
 
 fn draw_type_select(f: &mut ratatui::Frame, app: &App) {
@@ -495,7 +614,11 @@ fn draw_type_select(f: &mut ratatui::Frame, app: &App) {
             let enabled = !app.excluded_kinds.contains(kind);
             let mark = if enabled { "[x]" } else { "[ ]" };
             let cursor_marker = if i == app.filter_cursor { "> " } else { "  " };
-            let line = format!("{cursor_marker}{mark} {:<16} {}", kind.label(), kind.description());
+            let line = format!(
+                "{cursor_marker}{mark} {:<16} {}",
+                kind.label(),
+                kind.description()
+            );
             let style = if i == app.filter_cursor {
                 Style::default().fg(Color::Black).bg(Color::Yellow)
             } else if enabled {
@@ -508,29 +631,62 @@ fn draw_type_select(f: &mut ratatui::Frame, app: &App) {
         .collect();
 
     let list = List::new(items).block(
-        Block::default().borders(Borders::ALL).title(" Select artifact types to scan for "),
+        Block::default()
+            .borders(Borders::ALL)
+            .title(" Select artifact types to scan for "),
     );
     let mut list_state = ListState::default();
     list_state.select(Some(app.filter_cursor));
     f.render_stateful_widget(list, chunks[0], &mut list_state);
-    f.render_widget(Paragraph::new("↑/↓ move · space toggle · a select all · n select none · enter scan · q quit"), chunks[1]);
+    f.render_widget(
+        Paragraph::new(
+            "↑/↓ move · space toggle · a select all · n select none · enter scan · q quit",
+        ),
+        chunks[1],
+    );
 }
 
 fn draw_results(f: &mut ratatui::Frame, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Min(3), Constraint::Length(3), Constraint::Length(1)])
+        .constraints([
+            Constraint::Min(3),
+            Constraint::Length(3),
+            Constraint::Length(1),
+        ])
         .split(f.area());
 
-    let items: Vec<ListItem> = app.entries.iter().enumerate().map(|(i, e)| {
-        let checked = if app.selected.contains(&i) { "[x]" } else { "[ ]" };
-        let cursor_marker = if i == app.cursor { "> " } else { "  " };
-        let line = format!("{cursor_marker}{checked} {:>10}  {:<14} {}", human_size(e.size_bytes), e.kind.label(), e.path.display());
-        let style = if i == app.cursor { Style::default().fg(Color::Black).bg(Color::Yellow) } else { Style::default() };
-        ListItem::new(Line::from(Span::styled(line, style)))
-    }).collect();
+    let items: Vec<ListItem> = app
+        .entries
+        .iter()
+        .enumerate()
+        .map(|(i, e)| {
+            let checked = if app.selected.contains(&i) {
+                "[x]"
+            } else {
+                "[ ]"
+            };
+            let cursor_marker = if i == app.cursor { "> " } else { "  " };
+            let line = format!(
+                "{cursor_marker}{checked} {:>10}  {:<14} {}",
+                human_size(e.size_bytes),
+                e.kind.label(),
+                e.path.display()
+            );
+            let style = if i == app.cursor {
+                Style::default().fg(Color::Black).bg(Color::Yellow)
+            } else {
+                Style::default()
+            };
+            ListItem::new(Line::from(Span::styled(line, style)))
+        })
+        .collect();
 
-    let list = List::new(items).block(Block::default().borders(Borders::ALL).title(format!(" nodewipe — {} ", app.root.display())));
+    let list = List::new(items).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(format!(" nodewipe — {} ", app.root.display())),
+    );
     let mut list_state = ListState::default();
     list_state.select(Some(app.cursor));
     f.render_stateful_widget(list, chunks[0], &mut list_state);
@@ -538,14 +694,20 @@ fn draw_results(f: &mut ratatui::Frame, app: &App) {
     let total: u64 = app.entries.iter().map(|e| e.size_bytes).sum();
     let info = Paragraph::new(vec![Line::from(format!(
         "{} found · {} total · {} selected",
-        app.entries.len(), human_size(total), human_size(app.total_selected_size())
-    ))]).block(Block::default().borders(Borders::ALL).title(" Summary "));
+        app.entries.len(),
+        human_size(total),
+        human_size(app.total_selected_size())
+    ))])
+    .block(Block::default().borders(Borders::ALL).title(" Summary "));
     f.render_widget(info, chunks[1]);
 
     let help = if app.pending_action.is_some() {
         format!("{}  (y = confirm, any other key = cancel)", app.status)
     } else {
-        format!("{}  |  ↑/↓ move · space select · d trash · a archive · p permanent · R restore · t types · r rescan · q quit", app.status)
+        format!(
+            "{}  |  ↑/↓ move · space select · d trash · a archive · p permanent · R restore · t types · r rescan · q quit",
+            app.status
+        )
     };
     f.render_widget(Paragraph::new(help), chunks[2]);
 
@@ -566,27 +728,39 @@ fn draw_restore(f: &mut ratatui::Frame, app: &App) {
             Style::default().fg(Color::DarkGray),
         )))]
     } else {
-        app.archives.iter().enumerate().map(|(i, path)| {
-            let cursor_marker = if i == app.restore_cursor { "> " } else { "  " };
-            let size = std::fs::metadata(path).map(|m| human_size(m.len())).unwrap_or_default();
-            let line = format!("{cursor_marker}{size:>10}  {}", path.display());
-            let style = if i == app.restore_cursor {
-                Style::default().fg(Color::Black).bg(Color::Green)
-            } else {
-                Style::default()
-            };
-            ListItem::new(Line::from(Span::styled(line, style)))
-        }).collect()
+        app.archives
+            .iter()
+            .enumerate()
+            .map(|(i, path)| {
+                let cursor_marker = if i == app.restore_cursor { "> " } else { "  " };
+                let size = std::fs::metadata(path)
+                    .map(|m| human_size(m.len()))
+                    .unwrap_or_default();
+                let line = format!("{cursor_marker}{size:>10}  {}", path.display());
+                let style = if i == app.restore_cursor {
+                    Style::default().fg(Color::Black).bg(Color::Green)
+                } else {
+                    Style::default()
+                };
+                ListItem::new(Line::from(Span::styled(line, style)))
+            })
+            .collect()
     };
 
-    let list = List::new(items).block(
-        Block::default().borders(Borders::ALL)
-            .title(format!(" Restore archive — {}  ·  {} ", app.restore_status, app.root.display()))
-    );
+    let list = List::new(items).block(Block::default().borders(Borders::ALL).title(format!(
+        " Restore archive — {}  ·  {} ",
+        app.restore_status,
+        app.root.display()
+    )));
     let mut list_state = ListState::default();
-    if !app.archives.is_empty() { list_state.select(Some(app.restore_cursor)); }
+    if !app.archives.is_empty() {
+        list_state.select(Some(app.restore_cursor));
+    }
     f.render_stateful_widget(list, chunks[0], &mut list_state);
-    f.render_widget(Paragraph::new("↑/↓ move · enter restore · q/esc back to results"), chunks[1]);
+    f.render_widget(
+        Paragraph::new("↑/↓ move · enter restore · q/esc back to results"),
+        chunks[1],
+    );
 }
 
 fn draw_modal(f: &mut ratatui::Frame, title: &str, body_lines: &[String], is_warning: bool) {
@@ -595,7 +769,12 @@ fn draw_modal(f: &mut ratatui::Frame, title: &str, body_lines: &[String], is_war
     let height = (body_lines.len() as u16 + 4).min(area.height - 4);
     let x = (area.width.saturating_sub(width)) / 2;
     let y = (area.height.saturating_sub(height)) / 2;
-    let modal_area = Rect { x, y, width, height };
+    let modal_area = Rect {
+        x,
+        y,
+        width,
+        height,
+    };
     f.render_widget(Clear, modal_area);
 
     let border_color = if is_warning {
@@ -608,16 +787,37 @@ fn draw_modal(f: &mut ratatui::Frame, title: &str, body_lines: &[String], is_war
         Color::Green
     };
 
-    let lines: Vec<Line> = body_lines.iter().map(|l| {
-        if l.is_empty() { Line::from("") }
-        else { Line::from(Span::styled(l.clone(), if is_warning { Style::default().fg(Color::Yellow) } else { Style::default().fg(Color::White) })) }
-    }).collect();
+    let lines: Vec<Line> = body_lines
+        .iter()
+        .map(|l| {
+            if l.is_empty() {
+                Line::from("")
+            } else {
+                Line::from(Span::styled(
+                    l.clone(),
+                    if is_warning {
+                        Style::default().fg(Color::Yellow)
+                    } else {
+                        Style::default().fg(Color::White)
+                    },
+                ))
+            }
+        })
+        .collect();
 
     f.render_widget(
         Paragraph::new(lines)
-            .block(Block::default().borders(Borders::ALL)
-                .border_style(Style::default().fg(border_color))
-                .title(Span::styled(format!(" {title} "), Style::default().fg(border_color).add_modifier(Modifier::BOLD))))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(border_color))
+                    .title(Span::styled(
+                        format!(" {title} "),
+                        Style::default()
+                            .fg(border_color)
+                            .add_modifier(Modifier::BOLD),
+                    )),
+            )
             .wrap(Wrap { trim: false })
             .alignment(Alignment::Left),
         modal_area,
@@ -628,6 +828,9 @@ fn human_size(bytes: u64) -> String {
     const UNITS: [&str; 5] = ["B", "KB", "MB", "GB", "TB"];
     let mut size = bytes as f64;
     let mut unit = 0;
-    while size >= 1024.0 && unit < UNITS.len() - 1 { size /= 1024.0; unit += 1; }
+    while size >= 1024.0 && unit < UNITS.len() - 1 {
+        size /= 1024.0;
+        unit += 1;
+    }
     format!("{size:.2} {}", UNITS[unit])
 }
