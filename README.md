@@ -148,6 +148,14 @@ nodewipe scan ~ --older-than 30d
 # Skip specific artifact types
 nodewipe scan --exclude-types venv,dist,rust_target
 
+# Quick ecosystem presets (node, python, rust, java, go, dotnet)
+nodewipe scan --preset python
+nodewipe scan --preset node
+
+# Export results to CSV or JSON
+nodewipe scan --export report.csv
+nodewipe scan --export audit.json
+
 # List every supported type and its slug
 nodewipe types
 
