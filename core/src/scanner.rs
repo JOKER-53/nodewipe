@@ -267,13 +267,25 @@ fn build_entry(path: &Path, kind: ArtifactKind, compute_sizes: bool) -> Entry {
 }
 
 /// Sums file sizes under `path`. Symlinks are not followed to avoid double-counting.
+/// On Unix, uses 512-byte filesystem blocks allocated (`st_blocks * 512`) when available
+/// to accurately measure physical disk footprint (sparse files / cluster boundaries).
 pub fn dir_size(path: &Path) -> u64 {
     WalkDir::new(path)
         .follow_links(false)
         .into_iter()
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().is_file())
-        .map(|e| e.metadata().map(|m| m.len()).unwrap_or(0))
+        .map(|e| {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::MetadataExt;
+                e.metadata().map(|m| m.blocks() * 512).unwrap_or(0)
+            }
+            #[cfg(not(unix))]
+            {
+                e.metadata().map(|m| m.len()).unwrap_or(0)
+            }
+        })
         .sum()
 }
 

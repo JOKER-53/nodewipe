@@ -11,11 +11,15 @@ use std::path::PathBuf;
 /// ```toml
 /// default_delete_mode = "archive"
 /// default_exclude_types = ["venv", "rust_target"]
+/// default_min_mb = 10
+/// default_sort = "size"
 /// ```
 #[derive(Debug, Default, Deserialize)]
 pub struct Config {
     pub default_delete_mode: Option<String>,
     pub default_exclude_types: Option<Vec<String>>,
+    pub default_min_mb: Option<u64>,
+    pub default_sort: Option<String>,
 }
 
 pub fn config_path() -> Option<PathBuf> {

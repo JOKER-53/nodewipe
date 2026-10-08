@@ -7,7 +7,7 @@ mod update;
 use anyhow::{Context, Result};
 use clap::Parser;
 pub use cli_def::BANNER;
-use cli_def::{Cli, Command, DeleteModeArg, SortKey};
+use cli_def::{Cli, Command, DeleteModeArg, PresetArg, SortKey};
 use nodewipe_core::history::{format_date, now_unix};
 use nodewipe_core::{
     ArtifactKind, DeleteMode, Entry, HistoryEntry, ScanOptions, annotate_workspace_roots, delete,
@@ -73,6 +73,8 @@ fn run(cli: Cli) -> Result<ExitCode> {
                     None,
                     SortKey::Size,
                     None,
+                    None,
+                    None,
                 )
             } else {
                 tui::run(root)?;
@@ -86,6 +88,8 @@ fn run(cli: Cli) -> Result<ExitCode> {
             older_than,
             sort,
             stale_days,
+            preset,
+            export,
         }) => {
             let scan_root = sub_path.unwrap_or(root);
             cmd_scan(
@@ -98,6 +102,8 @@ fn run(cli: Cli) -> Result<ExitCode> {
                 older_than,
                 sort,
                 stale_days,
+                preset,
+                export,
             )
         }
         Some(Command::Delete {
@@ -203,12 +209,42 @@ fn cmd_scan(
     json: bool,
     min_mb: u64,
     grouped: bool,
-    exclude_kinds: Vec<ArtifactKind>,
+    mut exclude_kinds: Vec<ArtifactKind>,
     ignore_patterns: nodewipe_core::Gitignore,
     older_than: Option<String>,
     sort: SortKey,
     stale_days: Option<u64>,
+    preset: Option<PresetArg>,
+    export: Option<PathBuf>,
 ) -> Result<ExitCode> {
+    if let Some(preset) = preset {
+        let allowed: &[ArtifactKind] = match preset {
+            PresetArg::Node => &[
+                ArtifactKind::NodeModules,
+                ArtifactKind::NextCache,
+                ArtifactKind::TurboCache,
+                ArtifactKind::GenericDist,
+            ],
+            PresetArg::Python => &[
+                ArtifactKind::PythonVenv,
+                ArtifactKind::PythonPycache,
+                ArtifactKind::PythonPytestCache,
+                ArtifactKind::PythonMypyCache,
+                ArtifactKind::PythonRuffCache,
+            ],
+            PresetArg::Rust => &[ArtifactKind::RustTarget],
+            PresetArg::Java => &[ArtifactKind::JavaMavenTarget, ArtifactKind::JavaGradleBuild],
+            PresetArg::Go => &[ArtifactKind::GoModCache, ArtifactKind::GoBuildCache],
+            PresetArg::Dotnet => &[ArtifactKind::DotnetBin, ArtifactKind::DotnetObj],
+        };
+
+        for kind in ArtifactKind::ALL {
+            if !allowed.contains(kind) && !exclude_kinds.contains(kind) {
+                exclude_kinds.push(*kind);
+            }
+        }
+    }
+
     let opts = ScanOptions {
         root: root.to_path_buf(),
         exclude_kinds,
@@ -256,7 +292,7 @@ fn cmd_scan(
     };
 
     if grouped {
-        let groups = group_by_workspace(entries);
+        let groups = group_by_workspace(entries.clone());
         if json {
             println!(
                 "{}",
@@ -332,7 +368,59 @@ fn cmd_scan(
         }
     }
 
+    if let Some(export_path) = export {
+        export_scan_results(&export_path, &entries, &stale)?;
+        if !json {
+            eprintln!(
+                "Exported {} results to {}",
+                entries.len(),
+                export_path.display()
+            );
+        }
+    }
+
     Ok(ExitCode::SUCCESS)
+}
+
+fn export_scan_results(
+    path: &Path,
+    entries: &[Entry],
+    stale: &[nodewipe_core::StaleProject],
+) -> Result<()> {
+    let ext = path.extension().and_then(|s| s.to_str()).unwrap_or("");
+    if ext.eq_ignore_ascii_case("csv") {
+        let mut wtr = String::from("path,kind,size_bytes,package_manager,last_modified_unix\n");
+        for e in entries {
+            let pm = e
+                .package_manager
+                .map(|p| format!("{p:?}"))
+                .unwrap_or_default();
+            let mtime = e
+                .last_modified
+                .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
+                .map(|d| d.as_secs().to_string())
+                .unwrap_or_default();
+            wtr.push_str(&format!(
+                "\"{}\",\"{}\",{},\"{}\",{}\n",
+                e.path.display(),
+                e.kind.slug(),
+                e.size_bytes,
+                pm,
+                mtime
+            ));
+        }
+        std::fs::write(path, wtr)
+            .with_context(|| format!("writing CSV export to {}", path.display()))?;
+    } else {
+        let out = serde_json::json!({
+            "entries": entries,
+            "stale_projects": stale,
+        });
+        let content = serde_json::to_string_pretty(&out)?;
+        std::fs::write(path, content)
+            .with_context(|| format!("writing JSON export to {}", path.display()))?;
+    }
+    Ok(())
 }
 
 fn cmd_delete(

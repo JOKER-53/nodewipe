@@ -73,8 +73,8 @@ pub fn find_stale_projects(entries: &[Entry], threshold: Duration) -> Vec<StaleP
 /// excluding the artifact directory `artifact_path` itself.
 ///
 /// "Source files" = anything that isn't a known artifact directory.
-/// We cap the walk at depth 3 to stay fast on large projects; config files
-/// and source files are almost always at the root or one level deep.
+/// We cap the walk at depth 6 to support monorepo structures (e.g.,
+/// `apps/web/src/pages/index.tsx`) while still staying fast on large trees.
 fn youngest_source_file_mtime(root: &Path, artifact_path: &Path) -> Option<SystemTime> {
     use std::fs;
 
@@ -139,7 +139,7 @@ fn youngest_source_file_mtime(root: &Path, artifact_path: &Path) -> Option<Syste
         }
     }
 
-    walk(root, artifact_path, 3, &mut youngest);
+    walk(root, artifact_path, 6, &mut youngest);
     youngest
 }
 

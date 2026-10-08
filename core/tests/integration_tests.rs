@@ -172,3 +172,68 @@ fn test_history_stats_and_formatting() {
     assert_eq!(days[0].date, "2023-11-14");
     assert_eq!(days[0].bytes_freed, 700);
 }
+
+#[test]
+fn test_restore_rejects_path_traversal() {
+    let dir = tempdir().unwrap();
+    let root = dir.path();
+
+    // Craft raw tar header containing '..' path traversal
+    let evil_archive = root.join("evil-node_modules-backup.tar.gz");
+    let file = File::create(&evil_archive).unwrap();
+    let mut enc = flate2::write::GzEncoder::new(file, flate2::Compression::fast());
+
+    // A standard POSIX ustar header is 512 bytes
+    let mut header_bytes = [0u8; 512];
+    let path_str = b"node_modules/../../evil.txt";
+    header_bytes[..path_str.len()].copy_from_slice(path_str);
+    // Mode
+    header_bytes[100..107].copy_from_slice(b"0000644");
+    // Size (5 bytes in octal)
+    header_bytes[124..135].copy_from_slice(b"00000000005");
+    // Checksum calculation
+    // Fill checksum field with spaces
+    header_bytes[148..156].copy_from_slice(b"        ");
+    let cksum: u32 = header_bytes.iter().map(|&b| b as u32).sum();
+    let cksum_octal = format!("{:06o}\0 ", cksum);
+    header_bytes[148..156].copy_from_slice(cksum_octal.as_bytes());
+
+    enc.write_all(&header_bytes).unwrap();
+    // Payload (5 bytes padded to 512 bytes)
+    let mut payload = [0u8; 512];
+    payload[..5].copy_from_slice(b"pwned");
+    enc.write_all(&payload).unwrap();
+    // Tar end markers (1024 zeroes)
+    enc.write_all(&[0u8; 1024]).unwrap();
+    enc.finish().unwrap();
+
+    let err = restore(&evil_archive).unwrap_err();
+    assert!(err.to_string().contains("parent directory component '..'"));
+}
+
+#[cfg(unix)]
+#[test]
+fn test_symlink_delete_does_not_wipe_target() {
+    use std::os::unix::fs::symlink;
+
+    let dir = tempdir().unwrap();
+    let root = dir.path();
+
+    let real_dir = root.join("important_real_dir");
+    fs::create_dir(&real_dir).unwrap();
+    let canary = real_dir.join("precious_data.txt");
+    fs::write(&canary, b"do not delete").unwrap();
+
+    let fake_nm = root.join("node_modules");
+    symlink(&real_dir, &fake_nm).unwrap();
+
+    // Delete fake_nm with Permanent mode
+    let res = delete(&fake_nm, DeleteMode::Permanent, 0);
+    assert!(res.is_ok());
+
+    // Symlink should be gone, but the real target and files MUST remain intact!
+    assert!(!fake_nm.exists());
+    assert!(real_dir.exists());
+    assert!(canary.exists());
+    assert_eq!(fs::read_to_string(canary).unwrap(), "do not delete");
+}

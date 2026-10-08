@@ -27,9 +27,9 @@ pub struct DeleteResult {
 /// support "undo" for `Trash` (the OS trash already gives undo for free) and
 /// to report the archive location for `Archive`.
 pub fn delete(path: &Path, mode: DeleteMode, size_bytes: u64) -> Result<DeleteResult> {
-    if !path.exists() {
-        anyhow::bail!("path does not exist: {}", path.display());
-    }
+    // Check if the path exists (or is a broken symlink)
+    let meta = std::fs::symlink_metadata(path)
+        .with_context(|| format!("path does not exist: {}", path.display()))?;
 
     if crate::scanner::classify_path(path).is_none() {
         anyhow::bail!(
@@ -38,6 +38,8 @@ pub fn delete(path: &Path, mode: DeleteMode, size_bytes: u64) -> Result<DeleteRe
         );
     }
 
+    let is_symlink = meta.file_type().is_symlink();
+
     let archive_path = match mode {
         DeleteMode::Trash => {
             trash::delete(path)
@@ -45,6 +47,12 @@ pub fn delete(path: &Path, mode: DeleteMode, size_bytes: u64) -> Result<DeleteRe
             None
         }
         DeleteMode::Archive => {
+            if is_symlink {
+                anyhow::bail!(
+                    "refusing to archive symlink {}: remove it directly instead",
+                    path.display()
+                );
+            }
             let archive = archive_path_for(path);
             create_archive(path, &archive)
                 .with_context(|| format!("failed to archive {}", path.display()))?;
@@ -53,8 +61,27 @@ pub fn delete(path: &Path, mode: DeleteMode, size_bytes: u64) -> Result<DeleteRe
             Some(archive)
         }
         DeleteMode::Permanent => {
-            std::fs::remove_dir_all(path)
-                .with_context(|| format!("failed to remove {}", path.display()))?;
+            if is_symlink {
+                // If it's a symlink, delete the symlink itself without recursing into the target directory
+                #[cfg(unix)]
+                std::fs::remove_file(path)
+                    .with_context(|| format!("failed to remove symlink {}", path.display()))?;
+                #[cfg(windows)]
+                {
+                    if meta.is_dir() {
+                        std::fs::remove_dir(path).with_context(|| {
+                            format!("failed to remove symlink dir {}", path.display())
+                        })?;
+                    } else {
+                        std::fs::remove_file(path).with_context(|| {
+                            format!("failed to remove symlink file {}", path.display())
+                        })?;
+                    }
+                }
+            } else {
+                std::fs::remove_dir_all(path)
+                    .with_context(|| format!("failed to remove {}", path.display()))?;
+            }
             None
         }
     };
@@ -78,10 +105,35 @@ fn archive_path_for(artifact_path: &Path) -> PathBuf {
         .file_name()
         .and_then(|n| n.to_str())
         .unwrap_or("project");
-    parent.join(format!("{project_name}-{artifact_name}-backup.tar.gz"))
+
+    let base_name = format!("{project_name}-{artifact_name}-backup");
+    let initial = parent.join(format!("{base_name}.tar.gz"));
+    if !initial.exists() {
+        return initial;
+    }
+
+    // Avoid silent overwriting if a backup already exists: generate a timestamped or indexed filename
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let candidate = parent.join(format!("{base_name}-{now}.tar.gz"));
+    if !candidate.exists() {
+        return candidate;
+    }
+
+    for i in 1..1000 {
+        let candidate = parent.join(format!("{base_name}-{now}-{i}.tar.gz"));
+        if !candidate.exists() {
+            return candidate;
+        }
+    }
+
+    initial
 }
 
 fn create_archive(src_dir: &Path, dest_tar_gz: &Path) -> Result<()> {
+    // Open with create_new or check to protect existing archives
     let file = File::create(dest_tar_gz)?;
     let encoder = flate2::write::GzEncoder::new(file, flate2::Compression::fast());
     let mut builder = tar::Builder::new(encoder);
@@ -118,31 +170,6 @@ pub fn restore(archive_path: &Path) -> Result<PathBuf> {
     let decoder = flate2::read::GzDecoder::new(file);
     let mut archive = tar::Archive::new(decoder);
 
-    // Peek the top-level entry name to know (and check) the restored path
-    // before extracting, so we can refuse cleanly instead of partially
-    // overwriting something.
-    let entries = archive.entries().with_context(|| {
-        format!(
-            "failed to read archive entries in {}",
-            archive_path.display()
-        )
-    })?;
-    let mut restored_name: Option<String> = None;
-    for entry in entries {
-        let entry = entry?;
-        let path = entry.path()?;
-        if let Some(first) = path.components().next() {
-            restored_name = Some(first.as_os_str().to_string_lossy().to_string());
-            break;
-        }
-    }
-    let restored_name = restored_name.ok_or_else(|| {
-        anyhow::anyhow!(
-            "archive is empty or has an unexpected layout: {}",
-            archive_path.display()
-        )
-    })?;
-
     const VALID_ARTIFACT_NAMES: &[&str] = &[
         "node_modules",
         "venv",
@@ -163,6 +190,66 @@ pub fn restore(archive_path: &Path) -> Result<PathBuf> {
         "obj",
     ];
 
+    let mut restored_name: Option<String> = None;
+
+    // Validate entries without extracting first
+    let entries = archive.entries().with_context(|| {
+        format!(
+            "failed to read archive entries in {}",
+            archive_path.display()
+        )
+    })?;
+
+    for entry in entries {
+        let entry = entry?;
+        let path = entry.path()?;
+
+        // Prevent path traversal
+        for component in path.components() {
+            if let std::path::Component::ParentDir = component {
+                anyhow::bail!(
+                    "malicious archive: entry contains parent directory component '..' in {}",
+                    path.display()
+                );
+            }
+        }
+
+        if path.is_absolute() {
+            anyhow::bail!(
+                "malicious archive: entry contains absolute path in {}",
+                path.display()
+            );
+        }
+
+        // Prevent symlink exploitation
+        let header = entry.header();
+        if (header.entry_type().is_symlink() || header.entry_type().is_hard_link())
+            && let Some(target) = entry.link_name()?
+            && (target.is_absolute()
+                || target
+                    .components()
+                    .any(|c| matches!(c, std::path::Component::ParentDir)))
+        {
+            anyhow::bail!(
+                "malicious archive: link target points outside archive: {}",
+                target.display()
+            );
+        }
+
+        if restored_name.is_none()
+            && let Some(first) = path.components().next()
+        {
+            restored_name = Some(first.as_os_str().to_string_lossy().to_string());
+        }
+    }
+
+    let restored_name = restored_name.ok_or_else(|| {
+        anyhow::anyhow!(
+            "archive is empty or has an unexpected layout: {}",
+            archive_path.display()
+        )
+    })?;
+
     if !VALID_ARTIFACT_NAMES.contains(&restored_name.as_str()) {
         anyhow::bail!(
             "refusing to restore: archive contains an unexpected top-level directory name '{}'",
@@ -179,7 +266,7 @@ pub fn restore(archive_path: &Path) -> Result<PathBuf> {
         );
     }
 
-    // Re-open since `entries()` consumed the reader above.
+    // Re-open and unpack safely
     let file = File::open(archive_path)?;
     let decoder = flate2::read::GzDecoder::new(file);
     let mut archive = tar::Archive::new(decoder);

@@ -60,6 +60,7 @@ struct App {
     archives: Vec<PathBuf>,
     restore_cursor: usize,
     restore_status: String,
+    dry_run: bool,
 }
 
 impl App {
@@ -91,6 +92,7 @@ impl App {
             archives: Vec::new(),
             restore_cursor: 0,
             restore_status: String::new(),
+            dry_run: false,
         }
     }
 
@@ -302,6 +304,21 @@ impl App {
     }
 
     fn delete_indices(&mut self, indices: &[usize], mode: DeleteMode) {
+        if self.dry_run {
+            let simulated_freed: u64 = indices
+                .iter()
+                .filter_map(|&idx| self.entries.get(idx))
+                .map(|e| e.size_bytes)
+                .sum();
+            self.status = format!(
+                "[DRY-RUN] Would free {} ({} items) via {:?}",
+                human_size(simulated_freed),
+                indices.len(),
+                mode
+            );
+            return;
+        }
+
         let mut freed = 0u64;
         let mut errors = 0;
         let mut sorted = indices.to_vec();
@@ -469,6 +486,15 @@ fn event_loop(
                         KeyCode::Char('p') => {
                             let idx = app.selected_indices();
                             app.request_delete(idx, DeleteMode::Permanent);
+                        }
+                        KeyCode::Char('P') => {
+                            app.dry_run = !app.dry_run;
+                            app.status = if app.dry_run {
+                                "Dry-run preview mode ENABLED (no files will be deleted)"
+                                    .to_string()
+                            } else {
+                                "Dry-run preview mode DISABLED".to_string()
+                            };
                         }
                         _ => {}
                     }
@@ -701,12 +727,16 @@ fn draw_results(f: &mut ratatui::Frame, app: &App) {
     .block(Block::default().borders(Borders::ALL).title(" Summary "));
     f.render_widget(info, chunks[1]);
 
+    let dry_run_indicator = if app.dry_run { " [DRY-RUN ON]" } else { "" };
     let help = if app.pending_action.is_some() {
-        format!("{}  (y = confirm, any other key = cancel)", app.status)
+        format!(
+            "{}{}  (y = confirm, any other key = cancel)",
+            app.status, dry_run_indicator
+        )
     } else {
         format!(
-            "{}  |  ↑/↓ move · space select · d trash · a archive · p permanent · R restore · t types · r rescan · q quit",
-            app.status
+            "{}{}  |  ↑/↓ move · space select · d trash · a archive · p delete · P dry-run · R restore · t types · r rescan · q quit",
+            app.status, dry_run_indicator
         )
     };
     f.render_widget(Paragraph::new(help), chunks[2]);

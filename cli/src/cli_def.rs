@@ -95,6 +95,14 @@ pub enum Command {
         /// haven't been touched in this many days.
         #[arg(long, value_name = "DAYS")]
         stale_days: Option<u64>,
+
+        /// Preset to filter artifacts by development ecosystem.
+        #[arg(long, value_enum)]
+        preset: Option<PresetArg>,
+
+        /// Export scan results to a file (JSON or CSV based on extension or content).
+        #[arg(long, value_name = "FILE")]
+        export: Option<PathBuf>,
     },
 
     /// Delete one or more artifact directories.
@@ -189,4 +197,20 @@ pub enum SortKey {
     /// Sort by last-modified date, oldest first.
     /// Surfaces the most abandoned artifacts at the top of the list.
     Age,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum PresetArg {
+    /// JavaScript/TypeScript/Frontend ecosystems (node_modules, next, turbo, dist).
+    Node,
+    /// Python ecosystems (venv, __pycache__, pytest, mypy, ruff).
+    Python,
+    /// Rust/Cargo ecosystem (target).
+    Rust,
+    /// Java/JVM ecosystems (Maven target, Gradle build).
+    Java,
+    /// Go ecosystem (mod cache, build cache).
+    Go,
+    /// .NET ecosystem (bin, obj).
+    Dotnet,
 }

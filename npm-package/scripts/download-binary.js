@@ -13,6 +13,7 @@ function assetNameForPlatform() {
   const arch = process.arch;
 
   if (platform === "linux" && arch === "x64") return "nodewipe-linux-x86_64";
+  if (platform === "linux" && arch === "arm64") return "nodewipe-linux-aarch64";
   if (platform === "darwin" && arch === "x64") return "nodewipe-macos-x86_64";
   if (platform === "darwin" && arch === "arm64") return "nodewipe-macos-aarch64";
   if (platform === "win32" && arch === "x64") return "nodewipe-windows-x86_64.exe";

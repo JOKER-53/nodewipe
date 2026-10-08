@@ -7,7 +7,7 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 // ── types ────────────────────────────────────────────────────────────────────
@@ -79,8 +79,18 @@ pub fn append(entry: HistoryEntry) -> Result<()> {
     entries.push(entry);
 
     let serialized = serde_json::to_string_pretty(&entries).context("serializing history")?;
-    std::fs::write(&path, serialized)
-        .with_context(|| format!("writing history file {}", path.display()))?;
+
+    // Atomic write: write to a temporary file in the same directory, then rename
+    let parent_dir = path.parent().unwrap_or(Path::new("."));
+    let temp_file = parent_dir.join(format!(".history.json.tmp.{}", std::process::id()));
+    std::fs::write(&temp_file, serialized)
+        .with_context(|| format!("writing temp history file {}", temp_file.display()))?;
+
+    if let Err(e) = std::fs::rename(&temp_file, &path) {
+        let _ = std::fs::remove_file(&temp_file);
+        return Err(e).with_context(|| format!("renaming temp history to {}", path.display()));
+    }
+
     Ok(())
 }
 
