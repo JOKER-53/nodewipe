@@ -1,4 +1,4 @@
-# nodewipe
+# Nodewipe
 
 <div align="center">
   <img src="logo.svg" alt="nodewipe logo" width="120" height="120">
