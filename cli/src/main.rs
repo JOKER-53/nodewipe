@@ -129,6 +129,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
             clap_complete::generate(shell, &mut cmd, "nodewipe", &mut std::io::stdout());
             Ok(ExitCode::SUCCESS)
         }
+        Some(Command::Man { install }) => cmd_man(install),
     }
 }
 
@@ -200,6 +201,70 @@ fn cmd_types() -> Result<ExitCode> {
         println!("  {:<16} {}", "", kind.description());
         println!();
     }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn cmd_man(install: bool) -> Result<ExitCode> {
+    use clap::CommandFactory;
+    use clap_mangen::Man;
+
+    let cmd = Cli::command();
+    let man = Man::new(cmd);
+    let mut buf = Vec::new();
+    man.render(&mut buf)?;
+
+    if install {
+        let man_dir = dirs::data_dir()
+            .map(|d| d.join("man").join("man1"))
+            .unwrap_or_else(|| {
+                dirs::home_dir()
+                    .unwrap_or_else(|| PathBuf::from("."))
+                    .join(".local")
+                    .join("share")
+                    .join("man")
+                    .join("man1")
+            });
+
+        std::fs::create_dir_all(&man_dir)
+            .with_context(|| format!("creating directory {}", man_dir.display()))?;
+
+        let dest = man_dir.join("nodewipe.1");
+        std::fs::write(&dest, &buf)
+            .with_context(|| format!("writing man page to {}", dest.display()))?;
+
+        println!("Installed manual page to: {}", dest.display());
+
+        // Update man database if mandb is installed
+        let _ = std::process::Command::new("mandb")
+            .arg("-u")
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status();
+
+        println!("Run 'man nodewipe' to view it anytime.");
+        return Ok(ExitCode::SUCCESS);
+    }
+
+    if atty_stdout() {
+        // If man utility is available, pipe to man -l -
+        if let Ok(mut child) = std::process::Command::new("man")
+            .arg("-l")
+            .arg("-")
+            .stdin(std::process::Stdio::piped())
+            .spawn()
+        {
+            if let Some(mut stdin) = child.stdin.take() {
+                use std::io::Write;
+                let _ = stdin.write_all(&buf);
+            }
+            let _ = child.wait();
+            return Ok(ExitCode::SUCCESS);
+        }
+    }
+
+    // Default or non-interactive: output raw roff to stdout
+    use std::io::Write;
+    std::io::stdout().write_all(&buf)?;
     Ok(ExitCode::SUCCESS)
 }
 

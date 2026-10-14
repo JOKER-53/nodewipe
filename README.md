@@ -174,6 +174,10 @@ nodewipe delete ./apps/foo/node_modules --dry-run
 # Restore a backup created by --mode archive
 nodewipe restore ./apps/foo/foo-node_modules-backup.tar.gz
 
+# View or install the manual page
+nodewipe man
+nodewipe man --install   # installs to ~/.local/share/man/man1/ for 'man nodewipe'
+
 # Generate shell completions (e.g. bash, zsh, fish, powershell)
 nodewipe completions bash > ~/.local/share/bash-completion/completions/nodewipe
 

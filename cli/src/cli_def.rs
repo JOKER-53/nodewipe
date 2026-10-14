@@ -178,6 +178,16 @@ pub enum Command {
         #[arg(value_enum)]
         shell: clap_complete::Shell,
     },
+
+    /// Render or install the manual page for nodewipe.
+    ///
+    /// By default, views the man page or writes to stdout. Pass --install to
+    /// automatically copy it to ~/.local/share/man/man1/nodewipe.1.
+    Man {
+        /// Install man page to user man directory (~/.local/share/man/man1/).
+        #[arg(long)]
+        install: bool,
+    },
 }
 
 #[derive(Clone, Copy, ValueEnum)]
