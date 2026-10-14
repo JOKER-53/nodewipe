@@ -5,7 +5,7 @@ const https = require("https");
 const fs = require("fs");
 const path = require("path");
 
-const REPO = "KADHIRAVANEG/nodewipe"; 
+const REPO = "JOKER-53/nodewipe"; 
 const BIN_DIR = path.join(__dirname, "..", "bin");
 
 function assetNameForPlatform() {

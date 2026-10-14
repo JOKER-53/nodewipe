@@ -61,17 +61,17 @@ yay -S nodewipe
 # or: paru -S nodewipe
 
 # 3. Docker — scan any folder without installing anything
-docker run --rm -v "$PWD":/scan ghcr.io/kadhiravaneg/nodewipe
+docker run --rm -v "$PWD":/scan ghcr.io/joker-53/nodewipe
 # Scan a specific directory:
-docker run --rm -v ~/Projects:/scan ghcr.io/kadhiravaneg/nodewipe scan --json
+docker run --rm -v ~/Projects:/scan ghcr.io/joker-53/nodewipe scan --json
 # Interactive TUI inside Docker (needs a TTY):
-docker run --rm -it -v ~/Projects:/scan ghcr.io/kadhiravaneg/nodewipe scan
+docker run --rm -it -v ~/Projects:/scan ghcr.io/joker-53/nodewipe scan
 
 # 4. Shell installer — asks CLI-only vs CLI+GUI
-curl -fsSL https://raw.githubusercontent.com/KADHIRAVANEG/nodewipe/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/JOKER-53/nodewipe/main/install.sh | bash
 
 # 5. Manual — grab the binary for your platform from GitHub Releases
-#    https://github.com/KADHIRAVANEG/nodewipe/releases
+#    https://github.com/JOKER-53/nodewipe/releases
 ```
 
 None of these compile anything locally — `.github/workflows/release.yml` builds

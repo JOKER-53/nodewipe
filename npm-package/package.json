@@ -27,7 +27,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/KADHIRAVANEG/nodewipe.git"
+    "url": "git+https://github.com/JOKER-53/nodewipe.git"
   },
   "engines": {
     "node": ">=16"
