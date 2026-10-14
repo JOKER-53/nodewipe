@@ -34,7 +34,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            # Tag with the full version: ghcr.io/kadhiravaneg/nodewipe:v0.3.0
+            # Tag with the full version: ghcr.io/joker-53/nodewipe:v0.3.0
             type=semver,pattern={{version}}
             # Also tag as latest on every release
             type=raw,value=latest,enable={{is_default_branch}}
