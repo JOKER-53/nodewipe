@@ -52,7 +52,7 @@
     <main>
         <section class="hero">
             <div class="pill-badge">
-                <span class="indicator"></span> v0.6.0 Available
+                <span class="indicator"></span> v0.7.0 Available
             </div>
             <h1 class="hero-title">
                 Code base cleanups,<br>
@@ -110,6 +110,8 @@
                             <span class="tag">Python</span>
                             <span class="tag">Java</span>
                             <span class="tag">Go</span>
+                            <span class="tag">.NET</span>
+                            <span class="tag">PHP</span>
                         </div>
                     </div>
                 </div>
@@ -120,11 +122,16 @@
                             <span class="card-icon">🖥️</span>
                             <h3>Desktop & Terminal UI</h3>
                         </div>
-                        <p>Keyboard-driven Ratatui terminal interface, or a full-fledged Tauri desktop GUI. Complete visibility before you hit delete.</p>
-                        <div class="ui-mockup">
-                            <code>[ ] 12.3 GB  Cargo target    ~/Projects/npkill-rs/target</code><br>
-                            <code>[x] 1.6 GB   Python venv     ~/Projects/CRISPR/.venv</code><br>
-                            <code>[x] 491.7 MB node_modules    ~/Projects/fortisim/node_modules</code>
+                        <p>Keyboard-driven Ratatui terminal interface with interactive dry-run preview mode (<kbd style="background: rgba(255,255,255,0.1); padding: 0.1rem 0.4rem; border-radius: 4px;">P</kbd>), or a full-fledged Tauri desktop GUI. Complete visibility before you hit delete.</p>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-top: 1rem;">
+                            <div style="border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color); background: #000;">
+                                <div style="padding: 0.5rem 0.75rem; background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--border-color); font-size: 0.75rem; color: var(--text-muted); font-family: monospace;">Terminal TUI (Dry-Run Mode)</div>
+                                <img src="docs/screenshots/tui-dryrun.png" alt="nodewipe interactive TUI" style="width: 100%; display: block;">
+                            </div>
+                            <div style="border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color); background: #000;">
+                                <div style="padding: 0.5rem 0.75rem; background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--border-color); font-size: 0.75rem; color: var(--text-muted); font-family: monospace;">Tauri Desktop GUI</div>
+                                <img src="docs/screenshots/gui-overview.png" alt="nodewipe desktop GUI" style="width: 100%; display: block;">
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -136,6 +143,17 @@
                             <h3>Zero-Risk Excision</h3>
                         </div>
                         <p>Moves artifacts to OS Trash by default. Supports atomic <code>.tar.gz</code> archiving if you need an emergency undo.</p>
+                    </div>
+                </div>
+
+                <div class="bento-card bento-doctor">
+                    <div class="card-inner">
+                        <div class="card-header">
+                            <span class="card-icon">🩺</span>
+                            <h3>Ecosystem Doctor</h3>
+                        </div>
+                        <p>System-wide disk-hog analysis. Discovers your oldest untouched build caches and surfaces high-impact quick wins.</p>
+                        <code style="background: #000; padding: 0.5rem; border-radius: 4px; display: block; font-size: 0.85rem; color: var(--accent-primary);">nodewipe doctor ~</code>
                     </div>
                 </div>
 
