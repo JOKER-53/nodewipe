@@ -76,6 +76,25 @@ fn test_scan_and_ignore() {
 }
 
 #[test]
+fn test_is_ignored_outside_root_does_not_panic() {
+    let dir = tempdir().unwrap();
+    let root = dir.path();
+    let ignore_patterns = load_ignore_patterns(root);
+
+    // Testing a path outside the ignore root should safely return false instead of panicking
+    let outside_path = std::path::Path::new("/some/random/outside/path");
+    assert!(!nodewipe_core::ignorefile::is_ignored(outside_path, &ignore_patterns));
+
+    // Even if Gitignore has a relative root like ".", an absolute path outside should not panic
+    let dot_ignore = nodewipe_core::load_ignore_patterns(std::path::Path::new("."));
+    assert!(!nodewipe_core::ignorefile::is_ignored(outside_path, &dot_ignore));
+
+    // Empty ignore
+    let empty = nodewipe_core::Gitignore::empty();
+    assert!(!nodewipe_core::ignorefile::is_ignored(outside_path, &empty));
+}
+
+#[test]
 fn test_workspace_detection() {
     let dir = tempdir().unwrap();
     let root = dir.path();

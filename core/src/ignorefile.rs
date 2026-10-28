@@ -24,10 +24,24 @@ pub fn is_ignored(path: &Path, ignore: &Gitignore) -> bool {
         return false;
     }
 
+    let root = ignore.path();
+
+    // The ignore crate panics with "path is expected to be under the root"
+    // if `path` is absolute and does not begin with `ignore.path()`.
+    // If the path is not under the matcher's root, it cannot be ignored by it.
+    if path.has_root() {
+        if !root.has_root() || !path.starts_with(root) {
+            return false;
+        }
+    }
+
     // matched_path_or_any_parents tells us if the path or its ancestors are ignored
     let is_dir = true; // nodewipe scanner only passes directories to this function
-    matches!(
-        ignore.matched_path_or_any_parents(path, is_dir),
-        ignore::Match::Ignore(_)
-    )
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        matches!(
+            ignore.matched_path_or_any_parents(path, is_dir),
+            ignore::Match::Ignore(_)
+        )
+    }))
+    .unwrap_or(false)
 }

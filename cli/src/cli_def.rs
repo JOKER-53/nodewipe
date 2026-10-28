@@ -28,7 +28,7 @@ pub const BANNER: &str = r#"
         "scriptable/headless operation."
     ),
     before_help = BANNER,
-    after_help = "Full documentation: https://github.com/KADHIRAVANEG/nodewipe"
+    after_help = "Full documentation: https://github.com/JOKER-53/nodewipe"
 )]
 pub struct Cli {
     #[command(subcommand)]
@@ -177,6 +177,16 @@ pub enum Command {
     Completions {
         #[arg(value_enum)]
         shell: clap_complete::Shell,
+    },
+
+    /// Render or install the manual page for nodewipe.
+    ///
+    /// By default, views the man page or writes to stdout. Pass --install to
+    /// automatically copy it to ~/.local/share/man/man1/nodewipe.1.
+    Man {
+        /// Install man page to user man directory (~/.local/share/man/man1/).
+        #[arg(long)]
+        install: bool,
     },
 }
 

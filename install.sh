@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # nodewipe installer
-# Usage: curl -fsSL https://raw.githubusercontent.com/KADHIRAVANEG/nodewipe/main/install.sh | bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/JOKER-53/nodewipe/main/install.sh | bash
 set -euo pipefail
 
-REPO="KADHIRAVANEG/nodewipe"
+REPO="JOKER-53/nodewipe"
 API_LATEST="https://api.github.com/repos/${REPO}/releases/latest"
 
 info()  { printf "\033[1;34m==>\033[0m %s\n" "$1"; }
@@ -120,6 +120,22 @@ install_cli() {
   info "Downloading CLI from $url"
   install_binary "$url" "$dest"
   info "Installed CLI to $dest"
+
+  # Install man page
+  if [ -x "$dest" ]; then
+    if [ "${USE_SUDO:-0}" = "1" ] && [ -d /usr/local/share/man/man1 ] || [ -d /usr/share/man/man1 ]; then
+      local sys_man="/usr/local/share/man/man1"
+      sudo mkdir -p "$sys_man"
+      "$dest" man --raw 2>/dev/null | sudo tee "$sys_man/nodewipe.1" >/dev/null || true
+      command -v mandb >/dev/null 2>&1 && sudo mandb -u >/dev/null 2>&1 || true
+    else
+      local user_man="${XDG_DATA_HOME:-$HOME/.local/share}/man/man1"
+      mkdir -p "$user_man"
+      "$dest" man --raw > "$user_man/nodewipe.1" 2>/dev/null || true
+      command -v mandb >/dev/null 2>&1 && mandb -u >/dev/null 2>&1 || true
+    fi
+    info "Installed man page (view with 'man nodewipe')"
+  fi
 
   ensure_on_path
 }
