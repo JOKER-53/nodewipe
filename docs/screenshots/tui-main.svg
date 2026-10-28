@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 950 560" width="100%" height="100%">
+  <defs>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000000" flood-opacity="0.6"/>
+    </filter>
+    <linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1e1e2e"/>
+      <stop offset="100%" stop-color="#181825"/>
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Window Frame -->
+  <rect x="20" y="20" width="910" height="520" rx="12" fill="#11111b" stroke="#313244" stroke-width="1.5" filter="url(#shadow)"/>
+
+  <!-- Titlebar -->
+  <path d="M20,32 A12,12 0 0,1 32,20 L918,20 A12,12 0 0,1 930,32 L930,62 L20,62 Z" fill="url(#headerGrad)"/>
+  <circle cx="45" cy="41" r="6" fill="#f38ba8"/>
+  <circle cx="65" cy="41" r="6" fill="#f9e2af"/>
+  <circle cx="85" cy="41" r="6" fill="#a6e3a1"/>
+  <text x="475" y="46" font-family="'JetBrains Mono', monospace" font-size="13" font-weight="600" fill="#cdd6f4" text-anchor="middle">nodewipe — ~/Projects</text>
+
+  <!-- Content Box -->
+  <rect x="36" y="78" width="878" height="360" rx="6" fill="#181825" stroke="#313244" stroke-width="1"/>
+  
+  <!-- Scanned Rows -->
+  <!-- Header row -->
+  <text x="56" y="108" font-family="'JetBrains Mono', monospace" font-size="12" font-weight="700" fill="#6c7086">STATE    SIZE       AGE      KIND             PATH</text>
+  <line x1="56" y1="118" x2="894" y2="118" stroke="#313244" stroke-width="1"/>
+
+  <!-- Row 1: Selected Cargo target -->
+  <rect x="46" y="128" width="858" height="34" rx="4" fill="#313244" opacity="0.6"/>
+  <text x="56" y="150" font-family="'JetBrains Mono', monospace" font-size="13" font-weight="bold" fill="#89b4fa">[x]</text>
+  <text x="125" y="150" font-family="'JetBrains Mono', monospace" font-size="13" font-weight="bold" fill="#fab387">4.72 GB</text>
+  <text x="210" y="150" font-family="'JetBrains Mono', monospace" font-size="13" fill="#a6adc8">14d</text>
+  <rect x="260" y="136" width="105" height="20" rx="4" fill="#f38ba8" opacity="0.2"/>
+  <text x="270" y="150" font-family="'JetBrains Mono', monospace" font-size="12" font-weight="600" fill="#f38ba8">Rust Target</text>
+  <text x="390" y="150" font-family="'JetBrains Mono', monospace" font-size="13" fill="#cdd6f4">~/Projects/npkill-rs/target</text>
+
+  <!-- Row 2: Selected node_modules -->
+  <rect x="46" y="168" width="858" height="34" rx="4" fill="#313244" opacity="0.3"/>
+  <text x="56" y="190" font-family="'JetBrains Mono', monospace" font-size="13" font-weight="bold" fill="#89b4fa">[x]</text>
+  <text x="125" y="190" font-family="'JetBrains Mono', monospace" font-size="13" font-weight="bold" fill="#fab387">842.1 MB</text>
+  <text x="210" y="190" font-family="'JetBrains Mono', monospace" font-size="13" fill="#a6adc8">32d</text>
+  <rect x="260" y="176" width="105" height="20" rx="4" fill="#a6e3a1" opacity="0.2"/>
+  <text x="270" y="190" font-family="'JetBrains Mono', monospace" font-size="12" font-weight="600" fill="#a6e3a1">Node Modules</text>
+  <text x="390" y="190" font-family="'JetBrains Mono', monospace" font-size="13" fill="#cdd6f4">~/Projects/frontend-app/node_modules</text>
+
+  <!-- Row 3: Python venv -->
+  <text x="56" y="230" font-family="'JetBrains Mono', monospace" font-size="13" fill="#6c7086">[ ]</text>
+  <text x="125" y="230" font-family="'JetBrains Mono', monospace" font-size="13" fill="#cdd6f4">620.4 MB</text>
+  <text x="210" y="230" font-family="'JetBrains Mono', monospace" font-size="13" fill="#a6adc8">88d</text>
+  <rect x="260" y="216" width="105" height="20" rx="4" fill="#89dceb" opacity="0.2"/>
+  <text x="270" y="230" font-family="'JetBrains Mono', monospace" font-size="12" font-weight="600" fill="#89dceb">Python venv</text>
+  <text x="390" y="230" font-family="'JetBrains Mono', monospace" font-size="13" fill="#cdd6f4">~/Projects/ml-toolkit/.venv</text>
+
+  <!-- Row 4: Next.js Cache -->
+  <text x="56" y="270" font-family="'JetBrains Mono', monospace" font-size="13" fill="#6c7086">[ ]</text>
+  <text x="125" y="270" font-family="'JetBrains Mono', monospace" font-size="13" fill="#cdd6f4">412.0 MB</text>
+  <text x="210" y="270" font-family="'JetBrains Mono', monospace" font-size="13" fill="#a6adc8">5d</text>
+  <rect x="260" y="256" width="105" height="20" rx="4" fill="#cba6f7" opacity="0.2"/>
+  <text x="270" y="270" font-family="'JetBrains Mono', monospace" font-size="12" font-weight="600" fill="#cba6f7">Next Cache</text>
+  <text x="390" y="270" font-family="'JetBrains Mono', monospace" font-size="13" fill="#cdd6f4">~/Projects/web-dashboard/.next</text>
+
+  <!-- Row 5: Go Build Cache -->
+  <text x="56" y="310" font-family="'JetBrains Mono', monospace" font-size="13" fill="#6c7086">[ ]</text>
+  <text x="125" y="310" font-family="'JetBrains Mono', monospace" font-size="13" fill="#cdd6f4">285.6 MB</text>
+  <text x="210" y="310" font-family="'JetBrains Mono', monospace" font-size="13" fill="#a6adc8">42d</text>
+  <rect x="260" y="296" width="105" height="20" rx="4" fill="#f9e2af" opacity="0.2"/>
+  <text x="270" y="310" font-family="'JetBrains Mono', monospace" font-size="12" font-weight="600" fill="#f9e2af">Go Cache</text>
+  <text x="390" y="310" font-family="'JetBrains Mono', monospace" font-size="13" fill="#cdd6f4">~/Projects/backend-api/go-build</text>
+
+  <!-- Row 6: Gradle build -->
+  <text x="56" y="350" font-family="'JetBrains Mono', monospace" font-size="13" fill="#6c7086">[ ]</text>
+  <text x="125" y="350" font-family="'JetBrains Mono', monospace" font-size="13" fill="#cdd6f4">198.4 MB</text>
+  <text x="210" y="350" font-family="'JetBrains Mono', monospace" font-size="13" fill="#a6adc8">110d</text>
+  <rect x="260" y="336" width="105" height="20" rx="4" fill="#fab387" opacity="0.2"/>
+  <text x="270" y="350" font-family="'JetBrains Mono', monospace" font-size="12" font-weight="600" fill="#fab387">Java Gradle</text>
+  <text x="390" y="350" font-family="'JetBrains Mono', monospace" font-size="13" fill="#cdd6f4">~/Projects/legacy-service/build</text>
+
+  <!-- Summary Box -->
+  <rect x="36" y="448" width="878" height="40" rx="6" fill="#181825" stroke="#313244" stroke-width="1"/>
+  <text x="56" y="473" font-family="'JetBrains Mono', monospace" font-size="13" font-weight="bold" fill="#cdd6f4">
+    <tspan fill="#89b4fa">6 found</tspan> · <tspan fill="#fab387">7.07 GB total</tspan> · <tspan fill="#a6e3a1">5.56 GB selected (2 items)</tspan>
+  </text>
+
+  <!-- Help & Shortcuts Footer -->
+  <text x="36" y="515" font-family="'JetBrains Mono', monospace" font-size="12" fill="#9399b2">
+    <tspan fill="#cba6f7">↑/↓</tspan> move · <tspan fill="#cba6f7">space</tspan> select · <tspan fill="#a6e3a1">d</tspan> trash · <tspan fill="#89b4fa">a</tspan> archive · <tspan fill="#f38ba8">p</tspan> delete · <tspan fill="#f9e2af">P</tspan> dry-run · <tspan fill="#cba6f7">R</tspan> restore · <tspan fill="#cba6f7">q</tspan> quit
+  </text>
+</svg>

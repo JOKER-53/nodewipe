@@ -92,13 +92,18 @@ fn run(cli: Cli) -> Result<ExitCode> {
             export,
         }) => {
             let scan_root = sub_path.unwrap_or(root);
+            let scan_ignore = if cli.no_ignore_file {
+                nodewipe_core::Gitignore::empty()
+            } else {
+                load_ignore_patterns(&scan_root)
+            };
             cmd_scan(
                 &scan_root,
                 cli.json,
                 min_mb,
                 grouped,
                 exclude_kinds,
-                ignore_patterns,
+                scan_ignore,
                 older_than,
                 sort,
                 stale_days,
@@ -119,8 +124,16 @@ fn run(cli: Cli) -> Result<ExitCode> {
         Some(Command::Types) => cmd_types(),
         Some(Command::Gui) => cmd_gui(),
         Some(Command::Doctor { path: sub_path }) => {
-            let doctor_root = sub_path.unwrap_or(root);
-            cmd_doctor::run(doctor_root, cli.json, exclude_kinds, ignore_patterns)
+            let doctor_root = sub_path
+                .or(cli.path)
+                .or_else(|| dirs::home_dir())
+                .unwrap_or(root);
+            let doctor_ignore = if cli.no_ignore_file {
+                nodewipe_core::Gitignore::empty()
+            } else {
+                load_ignore_patterns(&doctor_root)
+            };
+            cmd_doctor::run(doctor_root, cli.json, exclude_kinds, doctor_ignore)
         }
         Some(Command::Stats { days, path: _ }) => cmd_stats::run(cli.json, days),
         Some(Command::Completions { shell }) => {

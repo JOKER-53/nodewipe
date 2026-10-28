@@ -11,7 +11,22 @@
   |_| \_|\___/ \__,_|\___| \_/\_/  |_| .__/ \___|
                                      |_|         
   ```
+
+  <p><strong>Blazingly fast, multi-ecosystem dev-environment cleaner written in Rust.</strong></p>
+  <p>Find, inspect, and safely reclaim gigabytes of disk space from stale dependency and build artifacts.</p>
+
+  <p>
+    <a href="https://github.com/JOKER-53/nodewipe/releases"><img src="https://img.shields.io/github/v/release/JOKER-53/nodewipe?style=flat-square&color=8b5cf6" alt="Release"></a>
+    <a href="https://aur.archlinux.org/packages/nodewipe"><img src="https://img.shields.io/aur/version/nodewipe?style=flat-square&color=3b82f6&label=AUR" alt="AUR"></a>
+    <a href="https://www.npmjs.com/package/@joker53/nodewipe"><img src="https://img.shields.io/npm/v/@joker53/nodewipe?style=flat-square&color=10b981" alt="npm"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square" alt="License"></a>
+  </p>
+
+  <br>
+  <img src="docs/screenshots/tui-main.png" alt="nodewipe interactive TUI overview" width="850">
 </div>
+
+<br>
 
 A Rust dev-environment cleanup tool. Started as a reimagining of
 [npkill](https://github.com/voidcosmos/npkill) (see the issue-to-fix mapping
@@ -168,9 +183,19 @@ nodewipe delete ./apps/foo/node_modules --yes
 # Archive before deleting (creates a .tar.gz backup)
 nodewipe delete ./apps/foo/node_modules --mode archive --yes
 
-# Preview only — no changes made
+# Preview only — no changes made (CLI flag)
 nodewipe delete ./apps/foo/node_modules --dry-run
+```
 
+### Interactive Dry-Run Mode
+
+Press <kbd>P</kbd> at any time inside the interactive TUI to toggle **Dry-Run Preview Mode**. Simulates deletion, calculates exact disk recovery, and gives total peace of mind before anything is touched:
+
+<div align="center">
+  <img src="docs/screenshots/tui-dryrun.png" alt="nodewipe TUI Dry-Run Simulation" width="850">
+</div>
+
+```bash
 # Restore a backup created by --mode archive
 nodewipe restore ./apps/foo/foo-node_modules-backup.tar.gz
 
@@ -192,6 +217,10 @@ nodewipe gui
 Scans your system and gives a full breakdown of disk usage by ecosystem —
 how many Rust `target/` folders, Python venvs, etc., how much space each
 ecosystem takes in total, and which artifact is the oldest (most abandoned).
+
+<div align="center">
+  <img src="docs/screenshots/cli-doctor.png" alt="nodewipe doctor ecosystem analysis" width="850">
+</div>
 
 ```bash
 nodewipe doctor ~
@@ -291,6 +320,10 @@ as the CLI. It has three tabs:
 
 All deletions made through the GUI are recorded to the same history file as
 the CLI, so `nodewipe stats` reflects GUI deletions too.
+
+<div align="center">
+  <img src="docs/screenshots/gui-overview.png" alt="nodewipe Desktop GUI Application" width="850">
+</div>
 
 ## Issue-to-fix mapping (voidcosmos/npkill)
 
