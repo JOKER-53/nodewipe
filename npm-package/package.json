@@ -25,6 +25,10 @@
     "scripts"
   ],
   "license": "MIT",
+  "homepage": "https://github.com/JOKER-53/nodewipe#readme",
+  "bugs": {
+    "url": "https://github.com/JOKER-53/nodewipe/issues"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/JOKER-53/nodewipe.git"
