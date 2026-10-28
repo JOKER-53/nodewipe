@@ -1,270 +1,232 @@
-# Nodewipe
-
 <div align="center">
-  <img src="logo.svg" alt="nodewipe logo" width="120" height="120">
-  
-  ```
-   _   _           _    __        ___            
-  | \ | | ___   __| | __\ \      / (_)_ __   ___ 
-  |  \| |/ _ \ / _` |/ _ \ \ /\ / /| | '_ \ / _ \
-  | |\  | (_) | (_| |  __/\ V  V / | | |_) |  __/
-  |_| \_|\___/ \__,_|\___| \_/\_/  |_| .__/ \___|
-                                     |_|         
-  ```
 
-  <p><strong>Blazingly fast, multi-ecosystem dev-environment cleaner written in Rust.</strong></p>
-  <p>Find, inspect, and safely reclaim gigabytes of disk space from stale dependency and build artifacts.</p>
+  <img src="logo.svg" alt="nodewipe logo" width="130" height="130">
 
-  <p>
-    <a href="https://github.com/JOKER-53/nodewipe/releases"><img src="https://img.shields.io/github/v/release/JOKER-53/nodewipe?style=flat-square&color=8b5cf6" alt="Release"></a>
-    <a href="https://aur.archlinux.org/packages/nodewipe"><img src="https://img.shields.io/aur/version/nodewipe?style=flat-square&color=3b82f6&label=AUR" alt="AUR"></a>
-    <a href="https://www.npmjs.com/package/@joker53/nodewipe"><img src="https://img.shields.io/npm/v/@joker53/nodewipe?style=flat-square&color=10b981" alt="npm"></a>
-    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square" alt="License"></a>
-  </p>
+  # nodewipe
+
+  **The surgical, blazing-fast dev-environment cleaner written in Rust.**  
+  *Reclaim tens of gigabytes from orphaned `node_modules`, Rust `target/`, Python `venv`s, and build caches across 17+ ecosystems.*
 
   <br>
+
+  [![Release](https://img.shields.io/github/v/release/JOKER-53/nodewipe?style=for-the-badge&color=8b5cf6&logo=github)](https://github.com/JOKER-53/nodewipe/releases)
+  [![AUR](https://img.shields.io/aur/version/nodewipe?style=for-the-badge&color=1793d1&logo=arch-linux&logoColor=white&label=AUR)](https://aur.archlinux.org/packages/nodewipe)
+  [![npm](https://img.shields.io/npm/v/@joker53/nodewipe?style=for-the-badge&color=cb3837&logo=npm)](https://www.npmjs.com/package/@joker53/nodewipe)
+  [![License](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
+  [![CI](https://img.shields.io/github/actions/workflow/status/JOKER-53/nodewipe/ci.yml?branch=main&style=for-the-badge&logo=github-actions&label=CI)](https://github.com/JOKER-53/nodewipe/actions)
+
+  <br><br>
+
+  <img src="docs/screenshots/tui-dryrun.png" alt="nodewipe interactive TUI overview" width="920">
+
+  <br><br>
+
+  [**Website & Live Demo**](https://joker53.me/nodewipe/) •
+  [**Installation**](#-installation) •
+  [**Key Features**](#-key-features) •
+  [**Supported Ecosystems**](#-supported-ecosystems) •
+  [**Interactive TUI**](#-interactive-tui--dry-run-mode) •
+  [**System Doctor**](#-system-doctor-nodewipe-doctor) •
+  [**Desktop GUI**](#-desktop-gui) •
+  [**CLI Cheat Sheet**](#-cli-cheat-sheet)
+
+</div>
+
+---
+
+## ⚡ Key Features
+
+* **🚀 Blazingly Fast**: Parallel directory traversal and physical filesystem block analysis (`st_blocks * 512`) powered by `rayon`. Scans hundreds of thousands of folders in seconds.
+* **🌐 17+ Ecosystems Covered**: Not just `node_modules` — handles Rust `target/`, Python `venv` / caches, Java Maven & Gradle, Go caches, .NET `bin/obj`, PHP `vendor`, Next.js, and Turborepo.
+* **🛡️ Zero-Risk Excision**: Moves to OS Trash by default. Supports atomic `.tar.gz` archiving if you want a compressed rollback backup before removing.
+* **🔍 Interactive TUI with Dry-Run Mode**: Full keyboard navigation, multi-select, and instant dry-run simulation (<kbd>P</kbd>) before touching a single byte.
+* **🩺 System Doctor**: `nodewipe doctor ~` analyzes disk-hog distribution across every toolchain and identifies abandoned build outputs.
+* **📦 Monorepo & Workspace Aware**: Automatically groups nested packages and monorepo roots (`pnpm`, `Cargo`, `Turborepo`, `Nx`).
+* **📊 Lifetime Savings Dashboard**: Track every byte reclaimed over time (`nodewipe stats`) with a 30-day interactive history chart.
+* **🖥️ Native Desktop GUI**: A lightweight, responsive Tauri desktop app wrapping the exact same high-speed Rust engine.
+
+---
+
+## 📦 Installation
+
+Choose your preferred installation method:
+
+### 1. NPM (No Rust toolchain required)
+Installs a lightweight shim that automatically fetches the matching native binary for your OS and architecture:
+```bash
+# Run instantly with npx:
+npx @joker53/nodewipe
+
+# Or install globally:
+npm install -g @joker53/nodewipe
+```
+
+### 2. Arch Linux (AUR)
+Maintained in the official Arch User Repository:
+```bash
+yay -S nodewipe
+# or: paru -S nodewipe
+```
+
+### 3. Universal Shell Installer
+Interactive installer with support for CLI-only or CLI + Desktop GUI:
+```bash
+curl -fsSL https://raw.githubusercontent.com/JOKER-53/nodewipe/main/install.sh | bash
+```
+
+### 4. Docker
+Run isolated scans without installing anything on your host machine:
+```bash
+# Scan current directory:
+docker run --rm -v "$PWD":/scan ghcr.io/joker-53/nodewipe
+
+# Interactive TUI inside Docker (requires TTY):
+docker run --rm -it -v ~/Projects:/scan ghcr.io/joker-53/nodewipe scan
+```
+
+### 5. Build from Source (Cargo)
+```bash
+cargo build --release
+./target/release/nodewipe
+```
+
+> [!TIP]
+> Precompiled standalone binaries for **Linux (x86_64, aarch64)**, **macOS (Intel & Apple Silicon)**, and **Windows (x86_64)** are available on the [GitHub Releases page](https://github.com/JOKER-53/nodewipe/releases).
+
+---
+
+## 🌐 Supported Ecosystems
+
+`nodewipe` uses strict **marker validation** to avoid false positives. A directory named `target`, `build`, or `dist` is only considered disposable if confirmed by sibling configuration files:
+
+| Ecosystem | Artifact Name | Slug | Marker Validation |
+|---|---|---|---|
+| **Node.js** | `node_modules` | `node_modules` | Directory name (identifies `npm`, `yarn`, `pnpm` from lockfile) |
+| **Python** | `venv`, `.venv` | `venv` | Contains `pyvenv.cfg` inside |
+| **Python** | `__pycache__` | `pycache` | Directory name |
+| **Python** | `.pytest_cache` | `pytest_cache` | Directory name |
+| **Python** | `.mypy_cache` | `mypy_cache` | Directory name |
+| **Python** | `.ruff_cache` | `ruff_cache` | Directory name |
+| **Rust** | `target/` | `rust_target` | Sibling `Cargo.toml` exists |
+| **Java** | `target/` | `maven_target` | Sibling `pom.xml` exists |
+| **Java** | `build/` | `gradle_build` | Sibling `build.gradle` or `build.gradle.kts` exists |
+| **Go** | `pkg/mod` | `go_mod_cache` | Sibling `go.mod` or `go.sum` exists |
+| **Go** | `go-build/` | `go_build_cache` | Directory name (`.cache/go-build`) |
+| **PHP** | `vendor/` | `php_vendor` | Sibling `composer.json` exists |
+| **.NET** | `bin/` | `dotnet_bin` | Sibling `*proj` project file exists |
+| **.NET** | `obj/` | `dotnet_obj` | Sibling `*proj` project file exists |
+| **Next.js** | `.next` | `next_cache` | Directory name |
+| **Turborepo**| `.turbo` | `turbo_cache` | Directory name |
+| **Bundlers**| `dist/` | `dist` | Sibling `package.json` or `pyproject.toml` exists |
+
+List all supported types and slugs at any time with:
+```bash
+nodewipe types
+```
+
+---
+
+## 💻 Interactive TUI & Dry-Run Mode
+
+Launching `nodewipe` with no arguments in a terminal opens the **Ratatui-powered interactive TUI**:
+
+<div align="center">
   <img src="docs/screenshots/tui-main.png" alt="nodewipe interactive TUI overview" width="850">
 </div>
 
-<br>
+### TUI Keyboard Shortcuts
 
-A Rust dev-environment cleanup tool. Started as a reimagining of
-[npkill](https://github.com/voidcosmos/npkill) (see the issue-to-fix mapping
-below), but goes further: `node_modules` isn't the only thing that quietly
-eats disk space — Python virtualenvs, `__pycache__`, Rust `target/`, Java/Gradle
-build output, and JS bundler caches all have the exact same problem. nodewipe
-scans for all of them by default, through one shared engine.
+| Key | Action |
+|---|---|
+| <kbd>↑</kbd> / <kbd>↓</kbd> or <kbd>k</kbd> / <kbd>j</kbd> | Move cursor up / down |
+| <kbd>Space</kbd> | Toggle selection for the focused directory |
+| <kbd>a</kbd> | Select all / Deselect all |
+| <kbd>d</kbd> | **Delete to Trash** (Recoverable via OS recycle bin) |
+| <kbd>Shift + a</kbd> | **Archive & Delete** (Creates `.tar.gz` backup adjacent to directory) |
+| <kbd>p</kbd> | **Permanent Delete** (Unrecoverable — prompts for confirmation) |
+| <kbd>P</kbd> | **Toggle Dry-Run Preview Mode** (Simulate recovery with zero risk) |
+| <kbd>R</kbd> | Restore an archived backup file |
+| <kbd>r</kbd> | Rescan current path |
+| <kbd>q</kbd> / <kbd>Esc</kbd> | Quit nodewipe |
 
-## Supported artifact types
+### Dry-Run Simulation Mode
 
-| Type | Slug | Detected by |
-|---|---|---|
-| `node_modules` | `node_modules` | directory name |
-| Python venv | `venv` | `venv`/`.venv` name + `pyvenv.cfg` inside |
-| Python bytecode cache | `pycache` | `__pycache__` |
-| pytest cache | `pytest_cache` | `.pytest_cache` |
-| mypy cache | `mypy_cache` | `.mypy_cache` |
-| ruff cache | `ruff_cache` | `.ruff_cache` |
-| Rust build output | `rust_target` | `target/` + sibling `Cargo.toml` |
-| Maven build output | `maven_target` | `target/` + sibling `pom.xml` |
-| Gradle build output | `gradle_build` | `build/` + sibling `build.gradle(.kts)` |
-| Next.js cache | `next_cache` | `.next` |
-| Turborepo cache | `turbo_cache` | `.turbo` |
-| Bundler/build output | `dist` | `dist/` + sibling `package.json`/`pyproject.toml` |
-| Go module cache | `go_mod_cache` | `mod/` + sibling `go.mod`/`go.sum` |
-| Go build cache | `go_build_cache` | `go-build/` |
-| PHP Composer vendor | `php_vendor` | `vendor/` + sibling `composer.json` |
-| .NET binary output | `dotnet_bin` | `bin/` + sibling `*proj` |
-| .NET intermediate output | `dotnet_obj` | `obj/` + sibling `*proj` |
-
-Everything is scanned by default (`nodewipe scan`); opt individual types out
-with `nodewipe --exclude-types venv,dist`, or list them all with `nodewipe types`.
-Ambiguous names like `target`/`build`/`dist` are only matched when a marker
-file confirms the ecosystem (e.g. `target/` next to `Cargo.toml`), so an
-unrelated folder that happens to share the name is never touched.
-
-## Installing
-
-```bash
-# 1. npm — downloads the right native binary via postinstall,
-#    no Rust/Node build step for the end user
-npx @joker53/nodewipe
-# or: npm install -g @joker53/nodewipe
-
-# 2. Arch Linux (AUR)
-yay -S nodewipe
-# or: paru -S nodewipe
-
-# 3. Docker — scan any folder without installing anything
-docker run --rm -v "$PWD":/scan ghcr.io/joker-53/nodewipe
-# Scan a specific directory:
-docker run --rm -v ~/Projects:/scan ghcr.io/joker-53/nodewipe scan --json
-# Interactive TUI inside Docker (needs a TTY):
-docker run --rm -it -v ~/Projects:/scan ghcr.io/joker-53/nodewipe scan
-
-# 4. Shell installer — asks CLI-only vs CLI+GUI
-curl -fsSL https://raw.githubusercontent.com/JOKER-53/nodewipe/main/install.sh | bash
-
-# 5. Manual — grab the binary for your platform from GitHub Releases
-#    https://github.com/JOKER-53/nodewipe/releases
-```
-
-None of these compile anything locally — `.github/workflows/release.yml` builds
-native binaries for Linux/macOS/Windows on every version tag and attaches them
-to a GitHub Release; the npm package and `install.sh` just fetch the matching
-one.
-
-### Publishing a new release
-
-```bash
-git tag vX.Y.Z
-git push origin vX.Y.Z
-```
-
-This triggers the GitHub Actions workflow to build and attach binaries. The npm
-shim only needs re-publishing when its own code changes:
-
-```bash
-cd npm-package
-npm version patch   # or minor/major
-npm publish --access=public
-```
-
-## Building from source
-
-```bash
-cargo build --release
-./target/release/nodewipe scan
-```
-
-## Building the GUI
-
-Requires Node.js/npm in addition to Rust, plus Tauri's native dependencies:
-- **Linux**: `webkit2gtk-4.1`, `libappindicator-gtk3`, `librsvg`, and build tools
-- **macOS**: Xcode Command Line Tools (`xcode-select --install`)
-- **Windows**: Microsoft C++ Build Tools + WebView2
-
-```bash
-cd gui
-npm install
-npm run dev      # dev mode with hot reload
-npm run build    # distributable bundle
-```
-
-## Usage (CLI)
-
-```bash
-# Interactive TUI (default when run in a terminal)
-nodewipe
-
-# Scan current directory
-nodewipe scan
-
-# Scan a specific directory
-nodewipe scan ~
-nodewipe scan ~/Projects
-
-# Only show artifacts >= 50 MB
-nodewipe scan ~ --min-mb 50
-
-# Group results by monorepo/workspace root
-nodewipe scan ~ --grouped
-
-# Sort by age — oldest (most abandoned) artifacts float to the top
-nodewipe scan ~ --sort age
-
-# Flag projects whose source files haven't been touched in 60+ days
-nodewipe scan ~ --stale-days 60
-
-# Only show artifacts untouched in 30+ days
-nodewipe scan ~ --older-than 30d
-# Also accepts w(eeks), m(onths ~30d), y(ears ~365d): --older-than 6m
-
-# Skip specific artifact types
-nodewipe scan --exclude-types venv,dist,rust_target
-
-# Quick ecosystem presets (node, python, rust, java, go, dotnet)
-nodewipe scan --preset python
-nodewipe scan --preset node
-
-# Export results to CSV or JSON
-nodewipe scan --export report.csv
-nodewipe scan --export audit.json
-
-# List every supported type and its slug
-nodewipe types
-
-# Scriptable / CI mode
-nodewipe scan --json > report.json
-
-# Delete: safe by default (moves to OS trash), requires --yes
-nodewipe delete ./apps/foo/node_modules --yes
-
-# Archive before deleting (creates a .tar.gz backup)
-nodewipe delete ./apps/foo/node_modules --mode archive --yes
-
-# Preview only — no changes made (CLI flag)
-nodewipe delete ./apps/foo/node_modules --dry-run
-```
-
-### Interactive Dry-Run Mode
-
-Press <kbd>P</kbd> at any time inside the interactive TUI to toggle **Dry-Run Preview Mode**. Simulates deletion, calculates exact disk recovery, and gives total peace of mind before anything is touched:
+Press <kbd>P</kbd> at any time in the TUI to activate **Dry-Run Mode**. It calculates the exact amount of space you would free and verifies file access without deleting or moving anything:
 
 <div align="center">
   <img src="docs/screenshots/tui-dryrun.png" alt="nodewipe TUI Dry-Run Simulation" width="850">
 </div>
 
-```bash
-# Restore a backup created by --mode archive
-nodewipe restore ./apps/foo/foo-node_modules-backup.tar.gz
+---
 
-# View or install the manual page
-nodewipe man
-nodewipe man --install   # installs to ~/.local/share/man/man1/ for 'man nodewipe'
+## 🩺 System Doctor (`nodewipe doctor`)
 
-# Generate shell completions (e.g. bash, zsh, fish, powershell)
-nodewipe completions bash > ~/.local/share/bash-completion/completions/nodewipe
-
-# Launch the desktop GUI
-nodewipe gui
-```
-
-## Analysis commands
-
-### `nodewipe doctor`
-
-Scans your system and gives a full breakdown of disk usage by ecosystem —
-how many Rust `target/` folders, Python venvs, etc., how much space each
-ecosystem takes in total, and which artifact is the oldest (most abandoned).
-
-<div align="center">
-  <img src="docs/screenshots/cli-doctor.png" alt="nodewipe doctor ecosystem analysis" width="850">
-</div>
+Analyze where your storage is disappearing across all developer environments. `nodewipe doctor` scans recursively, computes aggregate totals by ecosystem, and surfaces the oldest untouched artifacts:
 
 ```bash
 nodewipe doctor ~
 ```
 
-Example output:
-```
-🩺  nodewipe doctor — scanning /home/user …
+<div align="center">
+  <img src="docs/screenshots/cli-doctor.png" alt="nodewipe doctor ecosystem analysis" width="850">
+</div>
 
- Total reclaimable: 16.0 GB across 90 artifact directories
+```text
+ 🩺  nodewipe doctor — scanning /home/kadhir …
+
+ Total reclaimable: 14.4 GB across 142 artifact directories
 
  Ecosystem               Count        Total   Oldest      Oldest path
  ────────────────────────────────────────────────────────────────────────────────
- Cargo target                2      13.7 GB   51 days     ~/npkill-rs/target
- Python venv                 4       1.7 GB   82 days     ~/Downloads/.../venv
- node_modules                6     491.7 MB   69 days     ~/fortisim/.../node_modules
- Go build cache              1      70.0 MB   32 days     ~/.cache/go-build
- __pycache__                75       4.1 MB   121 days    ~/Downloads/.../__pycache__
+ Cargo target                1      10.8 GB   20 days     /home/kadhir/Projects/npkill-rs/target
+ Python venv                12       1.8 GB  145 days     /home/kadhir/Projects/.../venv
+ node_modules               17       1.4 GB  114 days     /home/kadhir/Projects/.../node_modules
+ Go build cache              1     211.5 MB   18 days     /home/kadhir/.cache/go-build
+ PHP vendor                  2     103.3 MB   33 days     /home/kadhir/HUNT/october/vendor
+ dist/                      21      71.1 MB   62 days     /home/kadhir/Projects/.../dist
+ Gradle build                1      15.5 MB    3 days     /home/kadhir/Projects/.../build
+ __pycache__                81      14.1 MB   35 days     /home/kadhir/Projects/.../__pycache__
+ .pytest_cache               6     116.0 KB   62 days     /home/kadhir/Projects/.../.pytest_cache
+ ────────────────────────────────────────────────────────────────────────────────
 
  Top space consumers:
-   12.3 GB  (51d ago)  ~/npkill-rs/target
-   1.6 GB   (1d ago)   ~/CRISPR/.venv
-   1.4 GB   (35d ago)  ~/linuxpet/target
-
- 💡 Next steps:
-    nodewipe scan --older-than 90d
-    nodewipe delete <path> --mode trash
+   10.8 GB  (20d ago)  /home/kadhir/Projects/npkill-rs/target
+    1.2 GB  (13d ago)  /home/kadhir/Projects/crashandlearn/venv
+   211.5 MB (18d ago)  /home/kadhir/.cache/go-build
 ```
 
-### `nodewipe stats`
+---
 
-Shows a dashboard of how much disk space you have freed over time, broken
-down by ecosystem, with a bar chart of the last 30 days. History is stored
-in `~/.local/share/nodewipe/history.json`.
+## 🖥️ Desktop GUI
+
+`nodewipe` includes an optional native desktop application built with **Tauri v2** and Vanilla JS for near-zero memory footprint:
+
+```bash
+nodewipe gui
+```
+
+<div align="center">
+  <img src="docs/screenshots/gui-overview.png" alt="nodewipe Desktop GUI Application" width="850">
+</div>
+
+* **🔍 Scan Tab**: Real-time path filtering, ecosystem filter chips, sortable columns, and collapsible monorepo tree view.
+* **🩺 Doctor Tab**: High-level ecosystem breakdown table and top disk hogs.
+* **📊 Stats Tab**: Visual bar chart of historical savings over the last 30 days.
+
+---
+
+## 📊 Lifetime Stats (`nodewipe stats`)
+
+Every deletion made through the CLI, TUI, or GUI is recorded to `~/.local/share/nodewipe/history.json`. Review your all-time disk savings with:
 
 ```bash
 nodewipe stats
 ```
 
-Example output:
-```
+```text
 📊  nodewipe stats — lifetime savings
 
- Total freed:  23.7 GB   across 63 deletions
+ Total freed:  23.7 GB across 63 deletions
 
  By ecosystem:
  ────────────────────────────────────────────────────────
@@ -276,137 +238,108 @@ Example output:
   2026-08-20  ████████████████  2.1 GB (4 deletions)
   2026-08-23  ████              512 MB (1 deletion)
   2026-08-27  ████████████████████████  340.2 MB (1 deletion)
-
- All-time total: 16.5 GB
 ```
 
-## Persistent config
+---
+
+## 📖 CLI Cheat Sheet
+
+```bash
+# ── Scanning ────────────────────────────────────────────────────────────────
+nodewipe scan                              # Scan current directory
+nodewipe scan ~/Projects                   # Scan specific path
+nodewipe scan ~ --min-mb 100               # Only surface artifacts >= 100 MB
+nodewipe scan ~ --grouped                  # Group by monorepo/workspace root
+nodewipe scan ~ --sort age                 # Sort oldest to newest
+nodewipe scan ~ --older-than 30d           # Only show artifacts untouched for 30+ days
+nodewipe scan ~ --stale-days 60            # Flag projects with source untouched in 60+ days
+nodewipe scan ~ --preset python            # Scan only Python artifacts (node, rust, java, go)
+nodewipe scan ~ --exclude-types venv,dist  # Skip specific types
+nodewipe scan ~ --export audit.csv         # Export results to CSV or JSON
+nodewipe scan ~ --json                     # Headless JSON output for CI/automation
+
+# ── Deleting & Restoring ───────────────────────────────────────────────────
+nodewipe delete ./path/node_modules --yes                 # Safe delete (OS Trash)
+nodewipe delete ./path/target --mode archive --yes       # Compressed tar.gz backup + delete
+nodewipe delete ./path/venv --mode permanent --yes       # Immediate permanent delete
+nodewipe delete ./path/node_modules --dry-run            # Preview deletion impact
+nodewipe restore ./path/app-target-backup.tar.gz         # Restore an archived backup
+
+# ── Analysis & Tooling ──────────────────────────────────────────────────────
+nodewipe doctor ~                          # Run system-wide disk-hog analysis
+nodewipe stats                             # Lifetime savings breakdown and bar chart
+nodewipe types                             # List all supported artifact types & slugs
+nodewipe man --install                     # Install system man page (~/.local/share/man/man1/)
+nodewipe completions bash > ~/.local/share/bash-completion/completions/nodewipe
+nodewipe gui                               # Launch desktop GUI
+```
+
+---
+
+## ⚙️ Configuration
 
 ### `.nodewipeignore`
+Place a `.nodewipeignore` file in your scan root (or in `~/.nodewipeignore` for global defaults). Supports standard `.gitignore` glob syntax:
 
-Drop a `.nodewipeignore` file in a scan root (or `~/.nodewipeignore` for a
-global rule set) to permanently skip specific paths. This file supports standard
-`.gitignore` glob syntax (powered by the standard `ignore` crate):
-
-```
-# .nodewipeignore
-legacy-project/
-apps/**/node_modules
-!apps/keep-this-one/node_modules
+```gitignore
+# Ignore legacy projects or critical directories
+archive/**
+apps/production-app/node_modules
+!apps/experimental/node_modules
 ```
 
-Disable for a single run with `--no-ignore-file`.
+Bypass ignore files with `--no-ignore-file`.
 
-### Config file
-
-`~/.config/nodewipe/config.toml` sets defaults that CLI flags always override:
-
+### Global Config (`~/.config/nodewipe/config.toml`)
 ```toml
-default_delete_mode = "archive"          # trash | archive | permanent
+# Set default deletion mode: "trash" | "archive" | "permanent"
+default_delete_mode = "trash"
+
+# Types to automatically exclude from all scans
 default_exclude_types = ["venv", "rust_target"]
 ```
 
-## GUI
+---
 
-The Tauri desktop app (`nodewipe gui`) wraps the same `nodewipe-core` engine
-as the CLI. It has three tabs:
+## 🥊 Comparison with npkill
 
-- **🔍 Scan** — search/filter, per-type filter chips, flat and collapsible
-  grouped (monorepo) views, sortable columns, select-all, colored type
-  badges, confirmation modal for permanent delete, toast notifications.
-- **🩺 Doctor** — ecosystem breakdown table and top space consumers for the
-  scanned folder.
-- **📊 Stats** — per-ecosystem deletion history and 30-day bar chart.
+`nodewipe` was built to address long-standing limitations in original Node-based cleanup utilities:
 
-All deletions made through the GUI are recorded to the same history file as
-the CLI, so `nodewipe stats` reflects GUI deletions too.
+| Feature / Issue | `npkill` | `nodewipe` |
+|---|:---:|:---:|
+| **Language & Engine** | Node.js (V8 runtime) | **Pure Rust (`rayon` multithreaded)** |
+| **Supported Ecosystems** | `node_modules` only | **17+ (Node, Rust, Python, Java, Go, .NET, PHP, Caches)** |
+| **Disk Size Accuracy** | Logical byte sum | **Physical cluster block calculation (`st_blocks`)** |
+| **Safety & Recovery** | Permanent unlink only | **OS Trash + Atomic `.tar.gz` Archiving** |
+| **Interactive Dry-Run** | ❌ No | **✅ Real-time simulation toggle (<kbd>P</kbd>)** |
+| **Monorepo / Workspace Support**| Flat results flood screen | **Automatic grouping by detected workspace root** |
+| **Scriptable Headless Mode** | ❌ No | **`--json`, `--yes`, `--export csv/json`, exit codes** |
+| **System Doctor Analysis** | ❌ No | **`nodewipe doctor` (Ecosystem breakdown & staleness)** |
+| **Lifetime History Tracking** | ❌ No | **`nodewipe stats` (Dashboard & historical bar chart)** |
+| **Native Desktop App** | ❌ No | **Tauri v2 Desktop GUI (`nodewipe gui`)** |
 
-<div align="center">
-  <img src="docs/screenshots/gui-overview.png" alt="nodewipe Desktop GUI Application" width="850">
-</div>
+---
 
-## Issue-to-fix mapping (voidcosmos/npkill)
-
-| npkill issue | What this project does differently |
-|---|---|
-| #188 no headless/scriptable mode | `--json` output + `--yes`/`--dry-run` flags + proper exit codes |
-| #199 / #191 nested directory bugs | Scanner prunes recursion only at matched artifact; sibling branches are never affected |
-| #104 no grouped/collapsed view | `workspace::group_by_workspace` groups by detected monorepo root |
-| #172 / #121 slow scan/delete | `rayon`-parallel directory walk and parallel size computation |
-| #60 no trash/undo | `DeleteMode::Trash` moves to OS trash instead of unlinking |
-| #46 no archive option | `DeleteMode::Archive` tars+gzips before removing |
-| #75 pnpm/Windows issues | Package manager detected from lockfile; `.pnpm` treated as part of one deletable unit |
-| #186 no desktop app | `gui/` — Tauri app wrapping the same `nodewipe-core` engine |
-
-## Roadmap
-
-1. ✅ Core scanning + deletion engine, scriptable CLI
-2. ✅ Interactive terminal UI with `ratatui`, multi-select, trash/archive/permanent
-3. ✅ Tauri GUI wrapping `nodewipe-core` (no engine code duplicated)
-4. ✅ Multi-ecosystem support (Python, Rust, Java, JS build caches), risk warnings
-5. ✅ Prebuilt binaries/installers via GitHub Actions for macOS/Linux/Windows, npm shim, `install.sh`
-6. ✅ `.nodewipeignore`, `~/.config/nodewipe/config.toml`, `restore`, `--older-than` age filtering
-7. ✅ AUR package (`nodewipe`), npm package (`@joker53/nodewipe`)
-8. ✅ `nodewipe doctor` — ecosystem analysis and disk-hog report
-9. ✅ `nodewipe stats` — lifetime deletion dashboard with history tracking
-10. ✅ Last-used sorting (`--sort age`) and stale project detection (`--stale-days`)
-11. ✅ GUI Doctor and Stats tabs
-12. ✅ Shell completions (bash/zsh/fish/powershell)
-13. ✅ Self-update check and automatic download for prebuilt binaries
-14. Homebrew tap + Scoop/winget packages
-15. Benchmark suite vs. npkill on a large monorepo fixture
-
-## Project layout
-
-```
-nodewipe/
-├── core/          # nodewipe-core: engine — scanner, deleter, history, doctor, stale detection
-├── cli/           # nodewipe-cli: argument parsing, output formatting, TUI
-├── gui/           # nodewipe-gui: Tauri desktop app
-│   ├── src-tauri/ # Rust backend (Tauri commands)
-│   └── web/       # Vanilla JS + CSS frontend
-├── npm-package/   # npm shim — downloads the right native binary on install
-├── packaging/
-│   └── aur/       # Arch Linux AUR PKGBUILD
-└── docker/        # Docker image
-```
-
-## Architecture
+## 🏗️ Architecture
 
 ```mermaid
 flowchart TD
-    classDef engine fill:#2c3e50,stroke:#34495e,color:#fff
-    classDef cli fill:#2980b9,stroke:#fff,color:#fff
-    classDef gui fill:#8e44ad,stroke:#fff,color:#fff
-    classDef output fill:#27ae60,stroke:#fff,color:#fff
-    classDef config fill:#f1c40f,stroke:#f39c12,color:#000
+    classDef engine fill:#1e293b,stroke:#3b82f6,color:#f8fafc
+    classDef cli fill:#0f172a,stroke:#8b5cf6,color:#f8fafc
+    classDef gui fill:#1e1b4b,stroke:#a855f7,color:#f8fafc
+    classDef output fill:#064e3b,stroke:#10b981,color:#f8fafc
+    classDef config fill:#451a03,stroke:#f59e0b,color:#f8fafc
 
-    Core["nodewipe-core
-    ─────────────
-    scanner · deleter
-    history · doctor
-    stale detection
-    workspace grouping"]:::engine
+    Core["<b>nodewipe-core</b><br/>───────<br/>Rayon Scanner · Safe Deleter<br/>Doctor Engine · History Logger<br/>Workspace Grouping · Ignore Engine"]:::engine
 
-    CLI["nodewipe-cli
-    ─────────────
-    scan · delete · restore
-    doctor · stats · types
-    TUI · --json mode"]:::cli
+    CLI["<b>nodewipe-cli</b><br/>───────<br/>Interactive Ratatui TUI<br/>CLI Commands · Dry-Run Mode<br/>Headless JSON & CSV Exporter"]:::cli
 
-    GUI["nodewipe-gui
-    ─────────────
-    Scan tab
-    Doctor tab
-    Stats tab"]:::gui
+    GUI["<b>nodewipe-gui</b><br/>───────<br/>Tauri v2 Native Desktop App<br/>Interactive Scan / Doctor / Stats Tabs"]:::gui
 
-    Config["config.toml
-    .nodewipeignore"]:::config
+    Config["<b>Config Files</b><br/>───────<br/>~/.config/nodewipe/config.toml<br/>.nodewipeignore"]:::config
 
-    HistFile["~/.local/share/nodewipe/
-    history.json"]:::output
-
-    Disk["Filesystem"]:::output
+    HistFile["<b>History Store</b><br/>~/.local/share/nodewipe/history.json"]:::output
+    Disk["<b>Host Filesystem</b>"]:::output
 
     Config -.-> CLI
     Config -.-> Core
@@ -417,3 +350,23 @@ flowchart TD
     CLI --> HistFile
     GUI --> HistFile
 ```
+
+---
+
+## 🤝 Contributing
+
+Contributions, issues, and feature requests are welcome!
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/awesome-feature`)
+3. Ensure all tests pass: `cargo test --workspace`
+4. Commit your changes (`git commit -m "feat: add awesome feature"`)
+5. Push to your branch (`git push origin feature/awesome-feature`)
+6. Open a Pull Request
+
+---
+
+## 📄 License
+
+This project is licensed under the [MIT License](LICENSE).
+Developed and maintained by [**JOKER-53**](https://github.com/JOKER-53).
